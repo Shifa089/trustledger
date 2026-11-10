@@ -8,6 +8,8 @@ Full spec: docs/SPEC.md. Read the relevant section before every task.
 - Start infra: docker compose -f infra/docker-compose.yml up -d
 - Start with observability: add --profile obs
 - Build and test everything: ./mvnw verify
+- Integration tests only: ./mvnw verify -DskipUnitTests
+- Once before -pl runs (and after changing event-contracts): ./mvnw install -DskipTests
 - Run core app: ./mvnw -pl core-app spring-boot:run -Dspring-boot.run.profiles=local
 - Run AML service: ./mvnw -pl risk-aml-service spring-boot:run -Dspring-boot.run.profiles=local
 

@@ -36,6 +36,10 @@
         -->
         <app.jvm.timezone>-Duser.timezone=UTC</app.jvm.timezone>
         <argLine>${app.jvm.timezone}</argLine>
+
+        <!-- ./mvnw verify -DskipUnitTests runs only the Failsafe *IT classes. -->
+        <skipUnitTests>false</skipUnitTests>
+        <jacoco.version>0.8.16</jacoco.version>
     </properties>
 
     <dependencyManagement>
@@ -74,5 +78,57 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <plugins>
+            <!-- Unit tests: fast, no containers. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <skip>${skipUnitTests}</skip>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
+
+            <!-- Integration tests (Testcontainers). Goals are bound by spring-boot-starter-parent. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <includes>
+                        <include>**/*IT.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
+
+            <!--
+              Coverage: prepare-agent prepends the agent to ${argLine}, which both Surefire and
+              Failsafe use, so unit + integration coverage land in one jacoco.exec per module.
+              report runs on verify -> target/site/jacoco/index.html.
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 </project>
