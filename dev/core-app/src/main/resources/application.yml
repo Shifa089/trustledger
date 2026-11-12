@@ -13,3 +13,22 @@ spring:
 
 server:
   port: 8080
+
+# Field-encryption and blind-index keys: base64, 32 bytes each, different from each other.
+# Supplied as environment variables (locally via .env). Startup fails if missing or invalid.
+trustledger:
+  crypto:
+    key: ${TRUSTLEDGER_CRYPTO_KEY:}
+    index-key: ${TRUSTLEDGER_CRYPTO_INDEX_KEY:}
+
+---
+# Every profile except local: structured JSON console logs (Elastic Common Schema).
+# MDC entries such as correlationId are included as JSON fields automatically.
+spring:
+  config:
+    activate:
+      on-profile: "!local"
+logging:
+  structured:
+    format:
+      console: ecs

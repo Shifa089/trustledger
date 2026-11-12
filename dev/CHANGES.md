@@ -104,3 +104,7 @@ matches the spec: `Instant` in code, UTC in the database.
 - Flyway migrations and per-module schemas: M1 onwards.
 - Observability configuration (dashboards, OTLP export from the apps): Day 23 (M12).
 - README skeleton: not done yet; suggested for the next session.
+
+---
+
+Day 2 (M1 shared foundation) is in [day2_changes.md](day2_changes.md).
