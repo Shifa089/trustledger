@@ -22,7 +22,7 @@ Testcontainers.
 | 1 | `./mvnw verify` | Full build: 222 unit/slice tests, 8 core-app ITs on Testcontainers, the Modulith boundary check, JaCoCo. Same command as CI. |
 | 2 | `./mvnw -pl core-app test -Dtest='MoneyTest,AesGcmCipherTest,ValidatorsTest'` | Fast loop for the pure logic (no Spring context, no Docker). |
 | 3 | Check `.env` has `TRUSTLEDGER_CRYPTO_KEY` and `TRUSTLEDGER_CRYPTO_INDEX_KEY` | core-app **refuses to start** without two different base64 32-byte keys. They were generated into your `.env`; on a new machine run `openssl rand -base64 32` twice. |
-| 4 | `docker compose -f infra/docker-compose.yml up -d`, then `./mvnw -pl core-app spring-boot:run -Dspring-boot.run.profiles=local` | Flyway applies `V1__shared_create_schemas.sql` to the compose Postgres and the app starts with the `.env` keys. |
+| 4 | `docker compose -f infra/docker-compose.yml up -d; if ($?) { ./mvnw -pl core-app spring-boot:run "-Dspring-boot.run.profiles=local" }` | Flyway applies `V1__shared_create_schemas.sql` to the compose Postgres and the app starts with the `.env` keys. |
 | 5 | `docker compose -f infra/docker-compose.yml exec postgres psql -U trustledger -d trustledger -c '\dn'` | Lists the 8 module schemas (`identity` … `notification`) plus `public`. |
 | 6 | `curl -i -H "X-Correlation-Id: demo-1" localhost:8080/api/v1/anything` | The response echoes `X-Correlation-Id: demo-1` and the log line shows `[demo-1]`. Until M2 adds real security rules, Spring's default security answers 401. |
 | 7 | Run core-app **without** the `local` profile (or look at any IT output) | Console logs are ECS JSON lines with a `correlationId` field. |
