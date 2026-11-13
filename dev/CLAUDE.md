@@ -16,7 +16,8 @@ Full spec: docs/SPEC.md. Read the relevant section before every task.
 ## Stack
 Java 25, Spring Boot 4.x, Spring Security 7 (OAuth2 resource server, Keycloak),
 Spring Data JPA + PostgreSQL + Flyway, Spring Modulith, Kafka, Redis, Resilience4j,
-Bucket4j, MapStruct, Lombok (entities only), Testcontainers, JUnit, Mockito, AssertJ.
+Bucket4j, MapStruct, Lombok (entities only), springdoc-openapi (ADR 0010), Testcontainers,
+JUnit, Mockito, AssertJ.
 
 ## Architecture rules (never break)
 - Modules: shared, identity, kyc, wallet, ledger, payments, audit, privacy,

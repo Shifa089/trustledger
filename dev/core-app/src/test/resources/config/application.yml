@@ -1,0 +1,7 @@
+# Test-only overrides, merged on top of src/main/resources/application.yml
+# (classpath:/config/ has higher precedence than classpath:/).
+# Fixed, obviously fake keys (32 bytes of 0x01 / 0x02). Never use them anywhere else.
+trustledger:
+  crypto:
+    key: AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
+    index-key: AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=
