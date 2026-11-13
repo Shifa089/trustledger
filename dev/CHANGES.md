@@ -108,3 +108,5 @@ matches the spec: `Instant` in code, UTC in the database.
 ---
 
 Day 2 (M1 shared foundation) is in [day2_changes.md](day2_changes.md).
+
+Day 3 (M2 part 1: Keycloak realm, API security, auth.http) is in [day3_implementation.md](day3_implementation.md).

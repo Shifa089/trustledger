@@ -10,6 +10,13 @@ spring:
       ddl-auto: validate
     properties:
       hibernate.jdbc.time_zone: UTC
+  # Resource server: SecurityConfig.jwtDecoder checks signature, expiry, issuer and audience.
+  # issuer-uri is set per environment (local profile: compose Keycloak; tests: Testcontainers).
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          audiences: trustledger-api
 
 server:
   port: 8080
@@ -20,6 +27,12 @@ trustledger:
   crypto:
     key: ${TRUSTLEDGER_CRYPTO_KEY:}
     index-key: ${TRUSTLEDGER_CRYPTO_INDEX_KEY:}
+  # CORS allowlist for /api/** (exact origins, no wildcards). Empty = no cross-origin browser access.
+  # swagger-public: Swagger UI without a token; only the local profile turns it on.
+  security:
+    cors:
+      allowed-origins: []
+    swagger-public: false
 
 ---
 # Every profile except local: structured JSON console logs (Elastic Common Schema).

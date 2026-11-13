@@ -4,12 +4,10 @@ import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.TrustLedgerException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -138,16 +136,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     private static ProblemDetail problem(ErrorCode code, String detail, String path) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(code.status(), detail);
-        problem.setType(code.type());
-        problem.setTitle(code.title());
-        problem.setInstance(URI.create(path));
-        problem.setProperty("errorCode", code.name());
-        String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
-        if (correlationId != null) {
-            problem.setProperty("correlationId", correlationId);
-        }
-        return problem;
+        return ProblemDetails.of(code, detail, path);
     }
 
     private static ResponseEntity<ProblemDetail> respond(ProblemDetail problem) {

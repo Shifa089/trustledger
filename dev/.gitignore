@@ -35,3 +35,6 @@ out/
 ### OS ###
 .DS_Store
 Thumbs.db
+
+### HTTP client (IntelliJ) private environment: holds the local test-user password ###
+http/http-client.private.env.json

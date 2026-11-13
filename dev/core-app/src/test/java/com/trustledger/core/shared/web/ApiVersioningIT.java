@@ -29,7 +29,7 @@ import org.springframework.web.context.WebApplicationContext;
 @Import(TestcontainersConfiguration.class)
 class ApiVersioningIT {
 
-    /** Real security rules arrive in M2; until then Boot's default chain just needs an authenticated user. */
+    /** Any authenticated user may call /api/v1/ping and read the API docs outside the local profile. */
     private static final RequestPostProcessor CUSTOMER = user("customer1").roles("CUSTOMER");
 
     @Autowired
@@ -58,8 +58,16 @@ class ApiVersioningIT {
     }
 
     @Test
-    void unversionedPathDoesNotExist() throws Exception {
+    void unversionedPathIsDeniedByDefault() throws Exception {
+        // Outside /api/** nothing is allowed (deny by default), so the caller never learns what exists.
         mvc.perform(get("/ping").with(CUSTOMER))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void unknownVersionedPathIsNotFound() throws Exception {
+        mvc.perform(get("/api/v1/does-not-exist").with(CUSTOMER))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("NOT_FOUND"));
     }

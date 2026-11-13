@@ -1,0 +1,110 @@
+### TrustLedger: get a Keycloak token for each test user, then call GET /api/v1/ping.
+# IntelliJ HTTP Client. Select the "local" environment.
+# One-time setup:
+#   1. .env has TRUSTLEDGER_DEV_USER_PASSWORD and TRUSTLEDGER_DEV_TOTP_SECRET (see .env.example),
+#      and Keycloak was (re)created after setting them:
+#        docker compose -f infra/docker-compose.yml up -d --force-recreate keycloak
+#   2. Copy http-client.private.env.json.example to http-client.private.env.json (git-ignored)
+#      and put the same password in it.
+#   3. Run core-app with the local profile.
+# The trustledger-dev client (password grant) exists for LOCAL TESTING ONLY. Tokens live 5 minutes.
+#
+# officer1, officer2 and admin1 need a current 6-digit TOTP code (OTP is required for staff).
+# Generate one, paste it into @otp below, and run that user's request within 30 seconds.
+# A code can be used only once, so generate a new one for each staff login:
+#   oathtool --totp -b "$(printf '%s' "$TRUSTLEDGER_DEV_TOTP_SECRET" | base32)"
+# (or add the base32 secret to an authenticator app once).
+
+@otp = 000000
+@token_url = {{keycloak}}/realms/{{realm}}/protocol/openid-connect/token
+
+### customer1: token
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=customer1&password={{password}}
+
+> {%
+    client.test("customer1 got a token", () => client.assert(response.status === 200, "status " + response.status));
+    client.global.set("customer1_token", response.body.access_token);
+%}
+
+### customer1: ping -> 200, roles [CUSTOMER]
+GET {{api}}/api/v1/ping
+Authorization: Bearer {{customer1_token}}
+
+### customer2: token
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=customer2&password={{password}}
+
+> {% client.global.set("customer2_token", response.body.access_token); %}
+
+### customer2: ping -> 200, roles [CUSTOMER]
+GET {{api}}/api/v1/ping
+Authorization: Bearer {{customer2_token}}
+
+### officer1: password only -> 400 invalid_grant (OTP is required)
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=officer1&password={{password}}
+
+### officer1: token (paste a fresh code into @otp first)
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=officer1&password={{password}}&totp={{otp}}
+
+> {% client.global.set("officer1_token", response.body.access_token); %}
+
+### officer1: ping -> 200, roles [COMPLIANCE_OFFICER]
+GET {{api}}/api/v1/ping
+Authorization: Bearer {{officer1_token}}
+
+### officer2: token (fresh code into @otp first)
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=officer2&password={{password}}&totp={{otp}}
+
+> {% client.global.set("officer2_token", response.body.access_token); %}
+
+### officer2: ping -> 200, roles [COMPLIANCE_OFFICER]
+GET {{api}}/api/v1/ping
+Authorization: Bearer {{officer2_token}}
+
+### admin1: token (fresh code into @otp first)
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=admin1&password={{password}}&totp={{otp}}
+
+> {% client.global.set("admin1_token", response.body.access_token); %}
+
+### admin1: ping -> 200, roles [ADMIN]
+GET {{api}}/api/v1/ping
+Authorization: Bearer {{admin1_token}}
+
+### auditor1: token
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=auditor1&password={{password}}
+
+> {% client.global.set("auditor1_token", response.body.access_token); %}
+
+### auditor1: ping -> 200, roles [AUDITOR]
+GET {{api}}/api/v1/ping
+Authorization: Bearer {{auditor1_token}}
+
+### No token -> 401 ProblemDetail (UNAUTHENTICATED) with WWW-Authenticate: Bearer
+GET {{api}}/api/v1/ping
+
+### Wrong role: customer1 on an admin path -> 403 ProblemDetail (ACCESS_DENIED)
+GET {{api}}/api/v1/admin/reconciliation/run
+Authorization: Bearer {{customer1_token}}
+
+### Public: health needs no token -> 200
+GET {{api}}/actuator/health
