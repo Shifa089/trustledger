@@ -1,0 +1,17 @@
+# Local profile: talks to infra/docker-compose.yml.
+# Secrets are read from the git-ignored .env file in the repo root
+# (spring-boot:run uses the module directory as working dir, hence ../.env).
+spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  datasource:
+    url: jdbc:postgresql://localhost:5432/${POSTGRES_DB}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ${REDIS_PASSWORD}

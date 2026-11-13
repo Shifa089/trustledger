@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    # The Maven project lives in dev/ (the git root is one level up).
+    working-directory: dev
+
+jobs:
+  verify:
+    name: ./mvnw verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Temurin 25 with Maven cache
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: dev/**/pom.xml
+
+      # Unit tests (Surefire), integration tests on Testcontainers (Failsafe; Docker is
+      # preinstalled on ubuntu runners), Modulith verify, JaCoCo report.
+      - name: Build and test
+        run: ./mvnw -B -ntp verify
+
+      - name: Upload JaCoCo reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-report
+          path: dev/**/target/site/jacoco/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: |
+            dev/**/target/surefire-reports/
+            dev/**/target/failsafe-reports/
+          retention-days: 7
