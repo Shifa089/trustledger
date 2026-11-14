@@ -1,5 +1,282 @@
 {
   "realm": "trustledger",
   "enabled": true,
-  "displayName": "TrustLedger"
+  "displayName": "TrustLedger",
+  "sslRequired": "external",
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "accessTokenLifespan": 300,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyCodeReusable": false,
+  "browserFlow": "browser-role-otp",
+  "directGrantFlow": "direct-grant-role-otp",
+  "roles": {
+    "realm": [
+      { "name": "CUSTOMER", "description": "Wallet customer: KYC, add money, send money, statements, privacy requests" },
+      { "name": "COMPLIANCE_OFFICER", "description": "Reviews KYC (maker or checker), held transfers, wallet freezes, AML cases. OTP required." },
+      { "name": "ADMIN", "description": "Reconciliation, ledger balances, configuration. OTP required." },
+      { "name": "AUDITOR", "description": "Read-only access to audit events and chain verification" },
+      { "name": "offline_access", "description": "Keycloak built-in: offline tokens" },
+      { "name": "uma_authorization", "description": "Keycloak built-in: UMA" },
+      {
+        "name": "default-roles-trustledger",
+        "description": "Granted to self-registered users: they are customers",
+        "composite": true,
+        "composites": { "realm": ["CUSTOMER", "offline_access", "uma_authorization"] }
+      }
+    ]
+  },
+  "defaultRole": { "name": "default-roles-trustledger" },
+  "clients": [
+    {
+      "clientId": "trustledger-web",
+      "name": "TrustLedger web app",
+      "description": "Browser SPA. Public client: authorization code flow with PKCE (S256) only.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": true,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "trustledger-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "trustledger-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "trustledger-dev",
+      "name": "TrustLedger dev (LOCAL TESTING ONLY)",
+      "description": "LOCAL TESTING ONLY. Password grant for http/auth.http and manual tests. Never create this client outside a developer machine.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "trustledger-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "trustledger-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "browser-role-otp",
+      "description": "Browser login. OTP is required for COMPLIANCE_OFFICER and ADMIN (by role, not only when configured).",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "auth-cookie", "authenticatorFlow": false, "requirement": "ALTERNATIVE", "priority": 10, "userSetupAllowed": false },
+        { "flowAlias": "browser-role-otp forms", "authenticatorFlow": true, "requirement": "ALTERNATIVE", "priority": 20, "userSetupAllowed": false }
+      ]
+    },
+    {
+      "alias": "browser-role-otp forms",
+      "description": "Username and password, then OTP for staff roles",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "auth-username-password-form", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
+        { "flowAlias": "browser-role-otp officer", "authenticatorFlow": true, "requirement": "CONDITIONAL", "priority": 20, "userSetupAllowed": false },
+        { "flowAlias": "browser-role-otp admin", "authenticatorFlow": true, "requirement": "CONDITIONAL", "priority": 30, "userSetupAllowed": false }
+      ]
+    },
+    {
+      "alias": "browser-role-otp officer",
+      "description": "OTP for COMPLIANCE_OFFICER",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "conditional-user-role", "authenticatorConfig": "browser-officer-role", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
+        { "authenticator": "auth-otp-form", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false }
+      ]
+    },
+    {
+      "alias": "browser-role-otp admin",
+      "description": "OTP for ADMIN",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "conditional-user-role", "authenticatorConfig": "browser-admin-role", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
+        { "authenticator": "auth-otp-form", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false }
+      ]
+    },
+    {
+      "alias": "direct-grant-role-otp",
+      "description": "Password grant (trustledger-dev, local only). The totp parameter is required for COMPLIANCE_OFFICER and ADMIN.",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "direct-grant-validate-username", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
+        { "authenticator": "direct-grant-validate-password", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false },
+        { "flowAlias": "direct-grant-role-otp officer", "authenticatorFlow": true, "requirement": "CONDITIONAL", "priority": 30, "userSetupAllowed": false },
+        { "flowAlias": "direct-grant-role-otp admin", "authenticatorFlow": true, "requirement": "CONDITIONAL", "priority": 40, "userSetupAllowed": false }
+      ]
+    },
+    {
+      "alias": "direct-grant-role-otp officer",
+      "description": "OTP for COMPLIANCE_OFFICER",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "conditional-user-role", "authenticatorConfig": "direct-grant-officer-role", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
+        { "authenticator": "direct-grant-validate-otp", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false }
+      ]
+    },
+    {
+      "alias": "direct-grant-role-otp admin",
+      "description": "OTP for ADMIN",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "conditional-user-role", "authenticatorConfig": "direct-grant-admin-role", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 10, "userSetupAllowed": false },
+        { "authenticator": "direct-grant-validate-otp", "authenticatorFlow": false, "requirement": "REQUIRED", "priority": 20, "userSetupAllowed": false }
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    { "alias": "browser-officer-role", "config": { "condUserRole": "COMPLIANCE_OFFICER", "negate": "false" } },
+    { "alias": "browser-admin-role", "config": { "condUserRole": "ADMIN", "negate": "false" } },
+    { "alias": "direct-grant-officer-role", "config": { "condUserRole": "COMPLIANCE_OFFICER", "negate": "false" } },
+    { "alias": "direct-grant-admin-role", "config": { "condUserRole": "ADMIN", "negate": "false" } }
+  ],
+  "users": [
+    {
+      "username": "customer1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Customer One",
+      "email": "customer1@example.test",
+      "credentials": [{ "type": "password", "value": "${TRUSTLEDGER_DEV_USER_PASSWORD}", "temporary": false }],
+      "realmRoles": ["CUSTOMER"]
+    },
+    {
+      "username": "customer2",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Customer Two",
+      "email": "customer2@example.test",
+      "credentials": [{ "type": "password", "value": "${TRUSTLEDGER_DEV_USER_PASSWORD}", "temporary": false }],
+      "realmRoles": ["CUSTOMER"]
+    },
+    {
+      "username": "officer1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Officer One",
+      "email": "officer1@example.test",
+      "credentials": [
+        { "type": "password", "value": "${TRUSTLEDGER_DEV_USER_PASSWORD}", "temporary": false },
+        {
+          "type": "otp",
+          "userLabel": "local-dev",
+          "secretData": "{\"value\":\"${TRUSTLEDGER_DEV_TOTP_SECRET}\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\"}"
+        }
+      ],
+      "realmRoles": ["COMPLIANCE_OFFICER"]
+    },
+    {
+      "username": "officer2",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Officer Two",
+      "email": "officer2@example.test",
+      "credentials": [
+        { "type": "password", "value": "${TRUSTLEDGER_DEV_USER_PASSWORD}", "temporary": false },
+        {
+          "type": "otp",
+          "userLabel": "local-dev",
+          "secretData": "{\"value\":\"${TRUSTLEDGER_DEV_TOTP_SECRET}\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\"}"
+        }
+      ],
+      "realmRoles": ["COMPLIANCE_OFFICER"]
+    },
+    {
+      "username": "admin1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Admin One",
+      "email": "admin1@example.test",
+      "credentials": [
+        { "type": "password", "value": "${TRUSTLEDGER_DEV_USER_PASSWORD}", "temporary": false },
+        {
+          "type": "otp",
+          "userLabel": "local-dev",
+          "secretData": "{\"value\":\"${TRUSTLEDGER_DEV_TOTP_SECRET}\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\"}"
+        }
+      ],
+      "realmRoles": ["ADMIN"]
+    },
+    {
+      "username": "auditor1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Auditor One",
+      "email": "auditor1@example.test",
+      "credentials": [{ "type": "password", "value": "${TRUSTLEDGER_DEV_USER_PASSWORD}", "temporary": false }],
+      "realmRoles": ["AUDITOR"]
+    }
+  ]
 }

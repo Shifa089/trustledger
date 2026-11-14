@@ -10,6 +10,11 @@ spring:
     url: jdbc:postgresql://localhost:5432/${POSTGRES_DB}
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${TRUSTLEDGER_ISSUER_URI:http://localhost:8180/realms/trustledger}
   data:
     redis:
       host: localhost
@@ -19,3 +24,10 @@ spring:
 logging:
   pattern:
     correlation: "[%X{correlationId:-}] "
+trustledger:
+  security:
+    # Vite dev server of the future web app (Keycloak client trustledger-web).
+    cors:
+      allowed-origins:
+        - http://localhost:5173
+    swagger-public: true

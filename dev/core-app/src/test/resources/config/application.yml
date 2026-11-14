@@ -5,3 +5,7 @@ trustledger:
   crypto:
     key: AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
     index-key: AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=
+  security:
+    cors:
+      allowed-origins:
+        - http://localhost:5173
