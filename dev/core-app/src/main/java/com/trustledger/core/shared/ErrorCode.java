@@ -23,6 +23,8 @@ public enum ErrorCode {
     IDEMPOTENCY_KEY_REUSED(HttpStatus.UNPROCESSABLE_CONTENT, "Idempotency key reused"),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Too many requests"),
     GATEWAY_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Payment gateway unavailable"),
+    /** Endpoint declared but not built yet (stubs such as POST /transfers until M6). */
+    NOT_IMPLEMENTED(HttpStatus.NOT_IMPLEMENTED, "Not implemented"),
     /** Framework-level 405/406/415; the handler keeps the framework's actual status. */
     UNSUPPORTED_REQUEST(HttpStatus.BAD_REQUEST, "Unsupported request"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error");

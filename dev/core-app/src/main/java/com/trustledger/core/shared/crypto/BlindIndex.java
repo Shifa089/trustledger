@@ -42,6 +42,16 @@ public class BlindIndex {
      * (11 digits). The result must be a 10-digit number.
      */
     public String phone(String phone) {
+        return hmac("phone", normalisePhone(phone));
+    }
+
+    /**
+     * The canonical 10-digit form used for the index; store this form too, so the stored value and its
+     * index always agree. {@code "+91 98765-43210" -> "9876543210"}.
+     *
+     * @throws IllegalArgumentException if blank or not 10 digits after normalisation
+     */
+    public static String normalisePhone(String phone) {
         String digits = requireText(phone).replaceAll("\\D", "");
         if (digits.length() == 12 && digits.startsWith("91")) {
             digits = digits.substring(2);
@@ -51,7 +61,7 @@ public class BlindIndex {
         if (digits.length() != 10) {
             throw new IllegalArgumentException("Phone number must have 10 digits");
         }
-        return hmac("phone", digits);
+        return digits;
     }
 
     /** Generic index for other fields: trims only. {@code field} separates the index spaces. */

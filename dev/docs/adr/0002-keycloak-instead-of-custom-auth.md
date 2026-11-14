@@ -50,7 +50,18 @@ Use **Keycloak 26** (same image locally, in Testcontainers and later on AWS) wit
   is tested, not just the Java code.
 - Realm changes are made in the JSON file and re-imported (`--force-recreate keycloak`); changes made
   in the admin console are lost on re-import unless exported back.
-- The `users` row in core-app is created just-in-time from the JWT (`sub`) on the first request
-  (FR-ID-2, Day 4); Keycloak remains the source of truth for credentials and roles.
+- The `users` row in core-app is created just-in-time from the JWT on the first authenticated
+  request (FR-ID-2); Keycloak remains the source of truth for credentials and roles. Details
+  (revised 2026-11-14, Day 4):
+  - **Claims copied once, at creation:** `sub` (required, unique), `email` and `name` (optional),
+    stored encrypted with an HMAC blind index for the e-mail. Roles are never copied: they are read
+    from every token, so a role removed in Keycloak takes effect within one token lifetime (5 min).
+    Later e-mail/name changes in Keycloak are not synced yet.
+  - **Mobile number is not taken from the token:** Keycloak does not verify it. It is set by minimum
+    KYC (FR-KYC-1, M3) and is unique per user (`phone_hash`), which P2P lookup by phone relies on.
+  - **Concurrent first requests:** the unique constraint on `keycloak_subject` decides; the request that
+    loses the insert (in its own transaction) re-reads the winner's row. No locks, no duplicates.
+  - **Where:** a servlet filter after Spring Security (and after rate limiting) for every
+    authenticated `/api/**` request; it also puts our `userId` into the log MDC.
 - On AWS the issuer URL changes; only `spring.security.oauth2.resourceserver.jwt.issuer-uri` and the
   clients' redirect URIs differ per environment.

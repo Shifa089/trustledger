@@ -29,8 +29,26 @@ class MaskingTest {
         assertThat(Masking.email(email)).isEqualTo(expected);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "Test Customer One, T*** C*** O***",
+            "Samiulla, S***",
+            "'  Ravi   Kumar  ', R*** K***",
+            "Élodie Āsha, É*** Ā***"
+    })
+    void masksNameKeepingInitialsOnly(String name, String expected) {
+        assertThat(Masking.name(name)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   "})
+    void blankNameIsFullyMaskedEvenWhitespace(String name) {
+        assertThat(Masking.name(name)).isEqualTo(Masking.FULLY_MASKED);
+    }
+
     @Test
     void nullStaysNull() {
+        assertThat(Masking.name(null)).isNull();
         assertThat(Masking.pan(null)).isNull();
         assertThat(Masking.phone(null)).isNull();
         assertThat(Masking.email(null)).isNull();

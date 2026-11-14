@@ -65,4 +65,11 @@ class BlindIndexTest {
         assertThatThrownBy(() -> index.email(blank)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> index.phone(blank)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"9876543210", "+91 98765 43210", "09876543210", "98765-43210"})
+    void normalisesPhoneToTheTenDigitsTheIndexUses(String phone) {
+        assertThat(BlindIndex.normalisePhone(phone)).isEqualTo("9876543210");
+        assertThat(index.phone(phone)).isEqualTo(index.phone("9876543210"));
+    }
 }

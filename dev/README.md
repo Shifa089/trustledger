@@ -87,4 +87,20 @@ curl -s http://localhost:8080/api/v1/ping -H "Authorization: Bearer $TOKEN"
 # {"status":"pong","subject":"<keycloak user id>","roles":["CUSTOMER"]}
 ```
 
+With the same token:
+
+```bash
+curl -s http://localhost:8080/api/v1/me -H "Authorization: Bearer $TOKEN"
+# {"id":"...","email":"c***@example.test","phone":null,"fullName":"T*** C*** O***","status":"ACTIVE","roles":["CUSTOMER"]}
+curl -s http://localhost:8080/api/v1/me/consents -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" -d '{"consents":[
+    {"purpose":"TERMS","policyVersion":"2026-11-01","granted":true},
+    {"purpose":"PRIVACY","policyVersion":"2026-11-01","granted":true}]}'
+```
+
+The first authenticated request creates the user row in `identity.users` (just-in-time provisioning).
+Personal data is stored encrypted and returned masked. Rate limits per user: 20 requests/minute on
+`POST /transfers` and `POST /topups` together, 100/minute on everything else; above that the API returns
+429 `RATE_LIMITED` with `Retry-After`.
+
 Swagger UI (local profile only, no token needed to open it): http://localhost:8080/swagger-ui.html

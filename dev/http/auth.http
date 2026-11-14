@@ -33,6 +33,45 @@ grant_type=password&client_id=trustledger-dev&username=customer1&password={{pass
 GET {{api}}/api/v1/ping
 Authorization: Bearer {{customer1_token}}
 
+### customer1: own profile -> 200, masked; the first call creates the user row (JIT provisioning)
+# {"id":"...","email":"c***@example.test","phone":null,"fullName":"T*** C*** O***","status":"ACTIVE","roles":["CUSTOMER"]}
+GET {{api}}/api/v1/me
+Authorization: Bearer {{customer1_token}}
+
+### customer1: consents -> requiredGiven=false at first; policyVersions shows what to send
+GET {{api}}/api/v1/me/consents
+Authorization: Bearer {{customer1_token}}
+
+### customer1: accept TERMS and PRIVACY, opt in to MARKETING -> 201
+POST {{api}}/api/v1/me/consents
+Authorization: Bearer {{customer1_token}}
+Content-Type: application/json
+
+{"consents":[
+  {"purpose":"TERMS","policyVersion":"2026-11-01","granted":true},
+  {"purpose":"PRIVACY","policyVersion":"2026-11-01","granted":true},
+  {"purpose":"MARKETING","policyVersion":"2026-11-01","granted":true}
+]}
+
+### customer1: withdraw MARKETING -> 201, a new history row (nothing is overwritten)
+POST {{api}}/api/v1/me/consents
+Authorization: Bearer {{customer1_token}}
+Content-Type: application/json
+
+{"consents":[{"purpose":"MARKETING","policyVersion":"2026-11-01","granted":false}]}
+
+### customer1: try to withdraw TERMS -> 400 VALIDATION_FAILED (required consent)
+POST {{api}}/api/v1/me/consents
+Authorization: Bearer {{customer1_token}}
+Content-Type: application/json
+
+{"consents":[{"purpose":"TERMS","policyVersion":"2026-11-01","granted":false}]}
+
+### customer1: transfer stub -> 501 NOT_IMPLEMENTED (until M6). Run 21 times within a minute:
+### the 21st gets 429 RATE_LIMITED with Retry-After. X-RateLimit-Remaining counts down.
+POST {{api}}/api/v1/transfers
+Authorization: Bearer {{customer1_token}}
+
 ### customer2: token
 POST {{token_url}}
 Content-Type: application/x-www-form-urlencoded

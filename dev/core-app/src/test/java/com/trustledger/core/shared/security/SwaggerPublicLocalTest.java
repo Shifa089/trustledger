@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.trustledger.core.shared.web.PingController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -17,9 +18,10 @@ import org.springframework.test.web.servlet.MockMvc;
  * The local profile's {@code trustledger.security.swagger-public=true}: Swagger needs no token, and the
  * relaxed swagger chain does not loosen the API. (Without the flag, {@code SecurityMatrixIT} shows
  * {@code /v3/api-docs} needs a token.) Slice test: springdoc is not loaded, so a permitted request
- * reaches MVC and gets 404 instead of the 401 the security chain would give.
+ * reaches MVC and gets 404 instead of the 401 the security chain would give. Only {@code PingController}
+ * is loaded: other controllers need services outside this slice.
  */
-@WebMvcTest(properties = "trustledger.security.swagger-public=true")
+@WebMvcTest(controllers = PingController.class, properties = "trustledger.security.swagger-public=true")
 @Import(SecurityConfig.class)
 class SwaggerPublicLocalTest {
 

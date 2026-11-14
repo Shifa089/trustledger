@@ -1,15 +1,12 @@
 package com.trustledger.core.shared.security;
 
 import com.trustledger.core.shared.ErrorCode;
+import com.trustledger.core.shared.web.ProblemDetailWriter;
 import com.trustledger.core.shared.web.ProblemDetails;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import org.springframework.http.MediaType;
-import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
@@ -28,10 +25,10 @@ class ProblemDetailSecurityHandler implements AuthenticationEntryPoint, AccessDe
 
     private final AuthenticationEntryPoint bearerEntryPoint = new BearerTokenAuthenticationEntryPoint();
     private final AccessDeniedHandler bearerAccessDenied = new BearerTokenAccessDeniedHandler();
-    private final JsonMapper jsonMapper;
+    private final ProblemDetailWriter writer;
 
     ProblemDetailSecurityHandler(JsonMapper jsonMapper) {
-        this.jsonMapper = jsonMapper;
+        this.writer = new ProblemDetailWriter(jsonMapper);
     }
 
     @Override
@@ -39,7 +36,7 @@ class ProblemDetailSecurityHandler implements AuthenticationEntryPoint, AccessDe
             throws IOException, ServletException {
         bearerEntryPoint.commence(request, response, ex);
         // Never echo the exception message: it can describe the token.
-        write(response, ProblemDetails.of(ErrorCode.UNAUTHENTICATED,
+        writer.write(response, ProblemDetails.of(ErrorCode.UNAUTHENTICATED,
                 "A valid bearer token is required.", request.getRequestURI()));
     }
 
@@ -47,30 +44,7 @@ class ProblemDetailSecurityHandler implements AuthenticationEntryPoint, AccessDe
     public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException ex)
             throws IOException, ServletException {
         bearerAccessDenied.handle(request, response, ex);
-        write(response, ProblemDetails.of(ErrorCode.ACCESS_DENIED,
+        writer.write(response, ProblemDetails.of(ErrorCode.ACCESS_DENIED,
                 "You are not allowed to perform this action.", request.getRequestURI()));
-    }
-
-    private void write(HttpServletResponse response, ProblemDetail problem) throws IOException {
-        if (response.isCommitted()) {
-            return;
-        }
-        response.setStatus(problem.getStatus());
-        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-        jsonMapper.writeValue(response.getOutputStream(), flatten(problem));
-    }
-
-    /** Same JSON shape as MVC's ProblemDetail serialization: extra properties at the top level. */
-    private static Map<String, Object> flatten(ProblemDetail problem) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("type", problem.getType().toString());
-        body.put("title", problem.getTitle());
-        body.put("status", problem.getStatus());
-        body.put("detail", problem.getDetail());
-        body.put("instance", problem.getInstance() == null ? null : problem.getInstance().toString());
-        if (problem.getProperties() != null) {
-            body.putAll(problem.getProperties());
-        }
-        return body;
     }
 }
