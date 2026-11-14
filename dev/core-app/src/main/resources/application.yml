@@ -33,6 +33,23 @@ trustledger:
     cors:
       allowed-origins: []
     swagger-public: false
+  # Currently published policy versions (FR-ID-3). Clients must send exactly these when consenting;
+  # bumping one makes users re-accept TERMS/PRIVACY (GET /me/consents shows requiredGiven=false).
+  identity:
+    policy-versions:
+      TERMS: "2026-11-01"
+      PRIVACY: "2026-11-01"
+      MARKETING: "2026-11-01"
+  # Per-user budgets in Redis (Bucket4j), keyed by the token subject. 429 RATE_LIMITED when exceeded.
+  # Money endpoints use their own, smaller bucket. If Redis is unreachable requests are allowed (fail open).
+  rate-limit:
+    enabled: true
+    default-per-minute: 100
+    money-per-minute: 20
+    money-endpoints:
+      - POST /api/*/transfers
+      - POST /api/*/topups
+    redis-timeout: 500ms
 
 ---
 # Every profile except local: structured JSON console logs (Elastic Common Schema).

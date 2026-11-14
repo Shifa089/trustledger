@@ -54,6 +54,7 @@ public class SecurityConfig {
     private static final String ADMIN = Role.ADMIN.name();
     private static final String AUDITOR = Role.AUDITOR.name();
     private static final String OFFICER = Role.COMPLIANCE_OFFICER.name();
+    private static final String CUSTOMER = Role.CUSTOMER.name();
 
     /**
      * Declared here instead of relying on Boot's conditional auto-configuration so that the checks are
@@ -115,6 +116,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/*/compliance/**").hasRole(OFFICER)
                         .requestMatchers("/api/*/admin/**").hasRole(ADMIN)
                         .requestMatchers("/api/*/audit/**").hasRole(AUDITOR)
+                        // Customer-only endpoints (SPEC §5). Checked here as well as by @PreAuthorize so a
+                        // wrong role gets 403 before the body is parsed (otherwise a bad body gives 400).
+                        .requestMatchers("/api/*/me/consents").hasRole(CUSTOMER)
+                        .requestMatchers(HttpMethod.POST, "/api/*/transfers", "/api/*/topups").hasRole(CUSTOMER)
                         .requestMatchers("/actuator/**").hasRole(ADMIN)
                         // Reached only when the local-only swagger chain does not exist.
                         .requestMatchers(SWAGGER_PATHS).authenticated()

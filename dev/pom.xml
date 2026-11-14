@@ -41,6 +41,8 @@
         <skipUnitTests>false</skipUnitTests>
         <jacoco.version>0.8.16</jacoco.version>
         <springdoc.version>3.2.0</springdoc.version>
+        <!-- Rate limiting (CLAUDE.md stack). 8.21.0: newest release older than two weeks on Day 4. -->
+        <bucket4j.version>8.21.0</bucket4j.version>
     </properties>
 
     <dependencyManagement>
@@ -54,6 +56,16 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
                 <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.bucket4j</groupId>
+                <artifactId>bucket4j_jdk17-core</artifactId>
+                <version>${bucket4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.bucket4j</groupId>
+                <artifactId>bucket4j_jdk17-lettuce</artifactId>
+                <version>${bucket4j.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.modulith</groupId>

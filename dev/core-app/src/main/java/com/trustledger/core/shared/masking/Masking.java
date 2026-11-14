@@ -32,6 +32,28 @@ public final class Masking {
         return PHONE.matcher(phone).matches() ? "******" + phone.substring(6) : FULLY_MASKED;
     }
 
+    /**
+     * {@code Test Customer One -> T*** C*** O***}: first letter of each word, three stars, so neither
+     * word lengths nor the remaining letters are revealed. Blank input is fully masked.
+     */
+    public static String name(String fullName) {
+        if (fullName == null) {
+            return null;
+        }
+        String[] words = fullName.strip().split("\\s+");
+        if (words[0].isEmpty()) {
+            return FULLY_MASKED;
+        }
+        StringBuilder masked = new StringBuilder();
+        for (String word : words) {
+            if (!masked.isEmpty()) {
+                masked.append(' ');
+            }
+            masked.appendCodePoint(word.codePointAt(0)).append("***");
+        }
+        return masked.toString();
+    }
+
     /** {@code samiulla@domain.com -> s***@domain.com}. Always three stars, so the length is hidden. */
     public static String email(String email) {
         if (email == null) {
