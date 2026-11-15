@@ -21,4 +21,15 @@ public interface IdentityApi {
      * Empty for an unknown or malformed number; it never says which.
      */
     Optional<UserView> findByPhone(String phone);
+
+    /**
+     * Stores the mobile number verified by minimum KYC (FR-KYC-1) on the user, encrypted, with its blind
+     * index. Joins the caller's transaction, so a later failure in the KYC step rolls this back too.
+     * Recording the number the user already has is a no-op.
+     *
+     * @throws com.trustledger.core.shared.TrustLedgerException {@code PHONE_ALREADY_REGISTERED} if another
+     *         user has this number; {@code NOT_FOUND} for an unknown user; {@code VALIDATION_FAILED} for a
+     *         malformed number
+     */
+    void recordVerifiedPhone(UUID userId, String phone);
 }

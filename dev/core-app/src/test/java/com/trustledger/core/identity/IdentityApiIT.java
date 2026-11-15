@@ -1,12 +1,15 @@
 package com.trustledger.core.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.trustledger.core.ApiMockMvc;
 import com.trustledger.core.TestcontainersConfiguration;
 import com.trustledger.core.identity.application.TokenIdentity;
 import com.trustledger.core.identity.application.UserProvisioningService;
 import com.trustledger.core.identity.domain.UserRepository;
+import com.trustledger.core.shared.ErrorCode;
+import com.trustledger.core.shared.TrustLedgerException;
 import com.trustledger.core.shared.crypto.BlindIndex;
 import java.time.Instant;
 import java.util.UUID;
@@ -82,7 +85,44 @@ class IdentityApiIT {
         assertThat(stored).isEqualTo(blindIndex.phone(phone)).doesNotContain(phone);
     }
 
-    /** Until KYC (M3) sets the phone, tests set it through the domain method. */
+    @Test
+    void recordVerifiedPhoneStoresNormalisedPhoneAndIsIdempotent() {
+        String phone = randomPhone();
+        UUID id = provisioning.ensureUser(new TokenIdentity(ApiMockMvc.newSubject(), null, "Kyc Phone"));
+
+        identityApi.recordVerifiedPhone(id, "+91 " + phone);
+        identityApi.recordVerifiedPhone(id, phone); // same number again: no error
+
+        assertThat(identityApi.findByPhone(phone)).get().extracting(UserView::id).isEqualTo(id);
+        String stored = tx.execute(status -> users.findById(id).orElseThrow().getPhone());
+        assertThat(stored).isEqualTo(phone);
+    }
+
+    @Test
+    void recordVerifiedPhoneRejectsANumberOwnedByAnotherUser() {
+        String phone = randomPhone();
+        userWithPhone("First Owner", phone);
+        UUID second = provisioning.ensureUser(new TokenIdentity(ApiMockMvc.newSubject(), null, "Second User"));
+
+        assertThatThrownBy(() -> identityApi.recordVerifiedPhone(second, phone))
+                .isInstanceOfSatisfying(TrustLedgerException.class,
+                        e -> assertThat(e.errorCode()).isEqualTo(ErrorCode.PHONE_ALREADY_REGISTERED));
+        String stored = tx.execute(status -> users.findById(second).orElseThrow().getPhone());
+        assertThat(stored).isNull();
+    }
+
+    @Test
+    void recordVerifiedPhoneRejectsUnknownUserAndMalformedNumber() {
+        assertThatThrownBy(() -> identityApi.recordVerifiedPhone(UUID.randomUUID(), randomPhone()))
+                .isInstanceOfSatisfying(TrustLedgerException.class,
+                        e -> assertThat(e.errorCode()).isEqualTo(ErrorCode.NOT_FOUND));
+        UUID id = provisioning.ensureUser(new TokenIdentity(ApiMockMvc.newSubject(), null, "Bad Phone"));
+        assertThatThrownBy(() -> identityApi.recordVerifiedPhone(id, "12345"))
+                .isInstanceOfSatisfying(TrustLedgerException.class,
+                        e -> assertThat(e.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+    }
+
+    /** Sets a phone directly through the domain method (bypassing the API under test). */
     private UUID userWithPhone(String name, String phone) {
         UUID id = provisioning.ensureUser(new TokenIdentity(ApiMockMvc.newSubject(), null, name));
         tx.executeWithoutResult(status -> users.findById(id).orElseThrow()

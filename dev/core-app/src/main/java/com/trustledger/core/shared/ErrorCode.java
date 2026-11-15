@@ -17,10 +17,15 @@ public enum ErrorCode {
     NOT_FOUND(HttpStatus.NOT_FOUND, "Not found"),
     REQUEST_IN_PROGRESS(HttpStatus.CONFLICT, "Request in progress"),
     MAKER_CHECKER_VIOLATION(HttpStatus.CONFLICT, "Maker-checker violation"),
+    /** The aggregate is not in a state that allows this step, e.g. approving a SUBMITTED KYC case. */
+    INVALID_STATE_TRANSITION(HttpStatus.CONFLICT, "Invalid state transition"),
+    KYC_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "KYC already submitted"),
+    PHONE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "Phone number already registered"),
     WALLET_FROZEN(HttpStatus.CONFLICT, "Wallet frozen"),
     INSUFFICIENT_FUNDS(HttpStatus.UNPROCESSABLE_CONTENT, "Insufficient funds"),
     LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_CONTENT, "Limit exceeded"),
     IDEMPOTENCY_KEY_REUSED(HttpStatus.UNPROCESSABLE_CONTENT, "Idempotency key reused"),
+    AGE_REQUIREMENT_NOT_MET(HttpStatus.UNPROCESSABLE_CONTENT, "Age requirement not met"),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Too many requests"),
     GATEWAY_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Payment gateway unavailable"),
     /** Endpoint declared but not built yet (stubs such as POST /transfers until M6). */
