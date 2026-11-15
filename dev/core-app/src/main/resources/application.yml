@@ -40,6 +40,9 @@ trustledger:
       TERMS: "2026-11-01"
       PRIVACY: "2026-11-01"
       MARKETING: "2026-11-01"
+  # Minimum age for KYC (FR-KYC-1), counted in Asia/Kolkata. Startup fails below 18.
+  kyc:
+    min-age-years: 18
   # Per-user budgets in Redis (Bucket4j), keyed by the token subject. 429 RATE_LIMITED when exceeded.
   # Money endpoints use their own, smaller bucket. If Redis is unreachable requests are allowed (fail open).
   rate-limit:

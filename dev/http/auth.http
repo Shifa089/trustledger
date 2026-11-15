@@ -147,3 +147,22 @@ Authorization: Bearer {{customer1_token}}
 
 ### Public: health needs no token -> 200
 GET {{api}}/actuator/health
+
+### customer1: minimum KYC (fake test data) -> 201 {level MIN, status APPROVED, maskedPan XXXXX1234X}
+# Run once; a second run -> 409 KYC_ALREADY_SUBMITTED.
+POST {{api}}/api/v1/kyc/min
+Authorization: Bearer {{customer1_token}}
+Content-Type: application/json
+
+{"fullName": "Test Customer One", "dateOfBirth": "1995-04-15", "mobile": "9876543210", "pan": "ABCPE1234F"}
+
+### customer1: own KYC status -> 200 {currentLevel: MIN, cases: [...]}
+GET {{api}}/api/v1/kyc/me
+Authorization: Bearer {{customer1_token}}
+
+### customer1: invalid PAN -> 400 VALIDATION_FAILED (field pan)
+POST {{api}}/api/v1/kyc/min
+Authorization: Bearer {{customer1_token}}
+Content-Type: application/json
+
+{"fullName": "Test Customer One", "dateOfBirth": "1995-04-15", "mobile": "9876543210", "pan": "ABCDE123F"}
