@@ -40,7 +40,23 @@ Run these from `dev/`. Start **Docker Desktop** first.
 - **Line coverage (JaCoCo):** `wallet.domain` 100%, `wallet.application` 100%, `wallet.infrastructure` 100%, `wallet` (API records) 97.5%, `wallet.web` 94.4%, `shared.config` 100%.
 - **Log check:** the build log contains none of the test freeze reasons. Reasons are free text and are never logged.
 
-I did not run the live check against the compose stack (steps 4 to 7) in this session.
+**Live check (steps 4 and 5), run after the merge:** the full compose stack with core-app on the local profile, driven with curl
+(the same requests as `http/wallet.http`, with real Keycloak tokens; staff logins used a generated TOTP code):
+
+| Request | Result |
+|---|---|
+| customer1 `GET /wallets/me` before minimum KYC | 403 `KYC_REQUIRED` |
+| customer1 `POST /kyc/min` | 201, level MIN, APPROVED |
+| customer1 `GET /wallets/me` | 200, MIN, ACTIVE, `0.00`, maxBalance `10000.00`, p2pAllowed false |
+| officer1 freeze | 200, FROZEN, source COMPLIANCE |
+| officer1 freeze again / without a reason | 409 `INVALID_STATE_TRANSITION` / 400 `VALIDATION_FAILED` (field `reason`) |
+| customer1 `GET /wallets/me` | 200, FROZEN |
+| customer1 freeze | 403 `ACCESS_DENIED` |
+| officer2 unfreeze / again | 200, ACTIVE, `currentFreeze` null / 409 |
+| unknown wallet | 404 `NOT_FOUND` |
+| officer1 `GET /wallets/me` | 403 (CUSTOMER only) |
+
+The app log contained no freeze reason, PAN, mobile, DOB or name, and no errors. Step 7 (psql) was not run separately.
 
 ---
 
@@ -101,7 +117,7 @@ The `LimitsProperties` startup checks fail the application on:
 | `shared/config/MoneyPropertyConverter` | `@ConfigurationPropertiesBinding` `String → Money` through `Money.parse` | Configuration amounts are `"10000.00"` strings in rupees. They are never floats and never rounded; `10000.005` fails startup. |
 | `SecurityConfig` | `/api/*/wallets/**` → `hasRole(CUSTOMER)`. Compliance wallet endpoints are covered by the existing `/compliance/**` rule. | Every endpoint has an explicit role rule. A wrong role gets 403 before the body is parsed. |
 | `application.yml` | `trustledger.limits.*` with the SPEC §2 values (quoted) | FR-W-2. |
-| `core-app/pom.xml` | `spring-modulith-events-api` (version from the Modulith BOM) | This jar holds `@ApplicationModuleListener`, and it was not on the classpath. It is part of Spring Modulith, which is already in the stack, and contains annotations only. |
+| `core-app/pom.xml` | `spring-modulith-events-api` (version from the Modulith BOM) | This jar holds `@ApplicationModuleListener`, and it was not on the classpath. It is part of Spring Modulith, which is already in the stack, and contains annotations only. Recorded in `docs/adr/0012-spring-modulith-events-api.md`. |
 | `docs/SPEC.md` §4 | The `wallet_freezes` row: `unfreeze_reason`, one open freeze, the FK | Docs match the code. |
 | `http/wallet.http` | `/me`, freeze, the customer getting 403, unfreeze, an unknown wallet | Manual smoke test. |
 
