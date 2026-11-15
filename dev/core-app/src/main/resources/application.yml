@@ -63,6 +63,20 @@ trustledger:
       region: ${AWS_REGION:ap-south-1}
       path-style: false
       create-bucket: false
+  # Wallet limits per tier (SPEC §2 limits table, FR-W-2). Amounts are QUOTED decimal strings in rupees
+  # (bound to Money, never floats). Startup fails on unsafe values, e.g. MIN allowing P2P, or a high-value
+  # threshold above the daily transfer limit. The RBI PPI values must be re-verified before production.
+  limits:
+    high-value-threshold: "50000.00"
+    min:
+      max-balance: "10000.00"
+      monthly-load: "10000.00"
+      p2p-allowed: false
+    full:
+      max-balance: "200000.00"
+      monthly-load: "200000.00"
+      p2p-allowed: true
+      daily-transfer: "100000.00"
   # Per-user budgets in Redis (Bucket4j), keyed by the token subject. 429 RATE_LIMITED when exceeded.
   # Money endpoints use their own, smaller bucket. If Redis is unreachable requests are allowed (fail open).
   rate-limit:

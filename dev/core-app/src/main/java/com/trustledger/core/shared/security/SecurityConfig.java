@@ -120,6 +120,7 @@ public class SecurityConfig {
                         // wrong role gets 403 before the body is parsed (otherwise a bad body gives 400).
                         .requestMatchers("/api/*/me/consents").hasRole(CUSTOMER)
                         .requestMatchers("/api/*/kyc/**").hasRole(CUSTOMER)
+                        .requestMatchers("/api/*/wallets/**").hasRole(CUSTOMER)
                         .requestMatchers(HttpMethod.POST, "/api/*/transfers", "/api/*/topups").hasRole(CUSTOMER)
                         .requestMatchers("/actuator/**").hasRole(ADMIN)
                         // Reached only when the local-only swagger chain does not exist.
