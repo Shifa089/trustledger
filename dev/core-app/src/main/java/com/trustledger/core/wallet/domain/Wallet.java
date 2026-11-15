@@ -73,7 +73,7 @@ public class Wallet {
     @Column(name = "currency", nullable = false, updatable = false, length = 3)
     private Currency currency;
 
-    /** TODO M5: set when the ledger has created this wallet's {@code WALLET:<id>} account. */
+    /** The wallet's {@code WALLET:<id>} ledger account; set once, right after the wallet is created (M5). */
     @Column(name = "ledger_account_id")
     private UUID ledgerAccountId;
 
@@ -129,6 +129,25 @@ public class Wallet {
             return false;
         }
         this.tier = target;
+        touch(now);
+        return true;
+    }
+
+    /**
+     * Records the wallet's ledger account. Set once: linking the same account again changes nothing, and a
+     * different account is a bug (two ledgers for one wallet), so it fails loudly.
+     *
+     * @return whether the link was new
+     */
+    public boolean linkLedgerAccount(UUID accountId, Instant now) {
+        Objects.requireNonNull(accountId, "accountId");
+        if (accountId.equals(ledgerAccountId)) {
+            return false;
+        }
+        if (ledgerAccountId != null) {
+            throw new IllegalStateException("Wallet " + id + " is already linked to ledger account " + ledgerAccountId);
+        }
+        this.ledgerAccountId = accountId;
         touch(now);
         return true;
     }

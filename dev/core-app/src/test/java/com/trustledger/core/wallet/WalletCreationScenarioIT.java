@@ -11,8 +11,13 @@ import com.trustledger.core.kyc.application.KycReviewService;
 import com.trustledger.core.kyc.application.MinKycCommand;
 import com.trustledger.core.kyc.application.MinKycService;
 import com.trustledger.core.kyc.domain.DocumentType;
+import com.trustledger.core.ledger.AccountCodes;
+import com.trustledger.core.ledger.LedgerApi;
+import com.trustledger.core.wallet.application.WalletLedgerLinkService;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.api.Test;
@@ -68,6 +73,12 @@ class WalletCreationScenarioIT {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    LedgerApi ledger;
+
+    @Autowired
+    WalletLedgerLinkService links;
+
     @Test
     void minimumKycOpensAnEmptyMinWalletAndPublishesWalletCreated(Scenario scenario) {
         UUID userId = fixtures.user();
@@ -82,6 +93,41 @@ class WalletCreationScenarioIT {
                     assertThat(wallet.status()).isEqualTo(WalletStatus.ACTIVE);
                     assertThat(wallet.balance().amountMinor()).isZero();
                 });
+    }
+
+    /** M5: WalletCreated → the wallet module opens WALLET:<id> through LedgerApi and stores the account's ID. */
+    @Test
+    void newWalletGetsItsLedgerAccount(Scenario scenario) {
+        UUID userId = fixtures.user();
+
+        scenario.stimulate(() -> minKyc.submit(minCommand(userId)))
+                .andWaitForStateChange(() -> ledgerAccountOf(userId), Objects::nonNull)
+                .andVerify(accountId -> {
+                    UUID walletId = wallets.findByUser(userId).orElseThrow().walletId();
+                    Map<String, Object> account = jdbc.queryForMap(
+                            "select code, type, normal_side, currency from ledger.ledger_accounts where id = ?",
+                            accountId);
+                    assertThat(account).containsEntry("code", AccountCodes.wallet(walletId))
+                            .containsEntry("type", "LIABILITY").containsEntry("normal_side", "CREDIT")
+                            .containsEntry("currency", "INR");
+                    assertThat(ledger.balanceOf(AccountCodes.wallet(walletId)).balanceMinor()).isZero();
+                });
+    }
+
+    @Test
+    void linkingAgainKeepsOneLedgerAccount() {
+        UUID walletId = fixtures.wallet(WalletTier.MIN);
+        UUID linked = jdbc.queryForObject("select ledger_account_id from wallet.wallets where id = ?", UUID.class,
+                walletId);
+
+        assertThat(links.link(walletId)).isEqualTo(linked).isNotNull();
+        assertThat(jdbc.queryForObject("select count(*) from ledger.ledger_accounts where code = ?", Integer.class,
+                AccountCodes.wallet(walletId))).isEqualTo(1);
+    }
+
+    private UUID ledgerAccountOf(UUID userId) {
+        return jdbc.queryForList("select ledger_account_id from wallet.wallets where user_id = ?", UUID.class, userId)
+                .stream().filter(Objects::nonNull).findFirst().orElse(null);
     }
 
     @Test

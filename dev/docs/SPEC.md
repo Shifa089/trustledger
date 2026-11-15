@@ -230,8 +230,8 @@ One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`,
 | `kyc.kyc_documents` | `id`, `case_id`, `doc_type` (PAN_CARD, ADDRESS_PROOF, PHOTO), `s3_key`, `content_type` (from magic bytes), `size_bytes`, `sha256`, `uploaded_by` | Size 1 byte to 5 MB; content type PDF/JPEG/PNG; `sha256` 64 lower-case hex; `s3_key` unique; FK to `kyc_cases` (same schema). Files live in S3 (SSE-S3), never in the database; no file names stored |
 | `wallet.wallets` | `id`, `user_id`, `tier` (MIN, FULL), `status` (ACTIVE, FROZEN, CLOSED), `balance_minor`, `held_minor`, `currency`, `ledger_account_id`, `version` | `user_id` unique; checks `balance_minor >= 0`, `held_minor >= 0`, `held_minor <= balance_minor` |
 | `wallet.wallet_freezes` | `id`, `wallet_id`, `source` (COMPLIANCE, AML), `reason`, `frozen_by`, `frozen_at`, `unfrozen_by`, `unfrozen_at`, `unfreeze_reason` | Freeze history for audits; at most one open freeze per wallet; an unfreeze sets who, when and why together; FK to `wallets` (same schema) |
-| `ledger.ledger_accounts` | `id`, `code`, `type` (ASSET, LIABILITY, REVENUE), `normal_side` (DEBIT, CREDIT), `currency` | `code` unique, for example `WALLET:<walletId>`, `PLATFORM:GATEWAY_CLEARING` |
-| `ledger.journal_entries` | `id`, `entry_type` (TOPUP, P2P\_TRANSFER, REVERSAL), `reference_type`, `reference_id`, `reverses_entry_id`, `posted_at` | Unique (`reference_type`, `reference_id`, `entry_type`) so the same business event can't be posted twice |
+| `ledger.ledger_accounts` | `id`, `code`, `type` (ASSET, LIABILITY, REVENUE), `normal_side` (DEBIT, CREDIT), `currency` | `code` unique, for example `WALLET:<walletId>`, `PLATFORM:GATEWAY_CLEARING`; ASSET iff DEBIT normal side. `PLATFORM:GATEWAY_CLEARING` (asset) and `PLATFORM:SUSPENSE` (liability) are seeded by migration. A wallet's account is opened by the **wallet** module through `LedgerApi` when it handles `WalletCreated`, so the ledger depends on no other module |
+| `ledger.journal_entries` | `id`, `entry_type` (TOPUP, P2P\_TRANSFER, REVERSAL), `reference_type`, `reference_id`, `reverses_entry_id`, `reason`, `posted_at` | Unique (`reference_type`, `reference_id`, `entry_type`) so the same business event can't be posted twice; `reverses_entry_id` unique (reversed at most once); `reverses_entry_id` and `reason` set iff REVERSAL. A reversal's reference is (`JOURNAL_ENTRY`, original ID) |
 | `ledger.journal_lines` | `id`, `entry_id`, `account_id`, `direction` (DEBIT, CREDIT), `amount_minor`, `line_no` | Check `amount_minor > 0`; index on (`account_id`, `entry_id`) |
 | `payments.transfers` | `id`, `sender_wallet_id`, `receiver_wallet_id`, `amount_minor`, `note`, `status` (INITIATED, HELD\_FOR\_REVIEW, COMPLETED, REJECTED, FAILED, REVERSED), `journal_entry_id`, `reviewed_by`, `version` | Index on (`sender_wallet_id`, `created_at`) for limit checks and history |
 | `payments.topups` | `id`, `wallet_id`, `amount_minor`, `gateway_order_id`, `gateway_payment_id`, `status` (CREATED, PENDING, CAPTURED, FAILED, EXPIRED), `journal_entry_id`, `version` | `gateway_order_id` unique |
@@ -247,7 +247,7 @@ One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`,
 **Database-level safety nets (Flyway migrations)**
 
 - A trigger on `journal_entries`, `journal_lines` and `audit_events` that raises an error on UPDATE or DELETE.
-- A deferred constraint trigger that, at commit, checks each journal entry's debits equal its credits.
+- A deferred constraint trigger that, at commit, checks each journal entry's debits equal its credits (and that it has at least 2 lines in one currency).
 - Check constraints on balances and amounts (listed above).
 
 **Ledger posting rules**
@@ -347,6 +347,7 @@ All endpoints sit under `/api/v1` (path versioning configured with Spring Framew
 | NOT\_FOUND | 404 |
 | REQUEST\_IN\_PROGRESS / MAKER\_CHECKER\_VIOLATION / WALLET\_FROZEN | 409 |
 | INVALID\_STATE\_TRANSITION / KYC\_ALREADY\_SUBMITTED / KYC\_DOCUMENTS\_MISSING / CONCURRENT\_MODIFICATION | 409 |
+| DUPLICATE\_POSTING (business event or reversal already in the ledger) | 409 |
 | DOCUMENT\_TOO\_LARGE / UNSUPPORTED\_DOCUMENT\_TYPE | 413 / 415 |
 | INSUFFICIENT\_FUNDS / LIMIT\_EXCEEDED / IDEMPOTENCY\_KEY\_REUSED | 422 |
 | RATE\_LIMITED | 429 |
