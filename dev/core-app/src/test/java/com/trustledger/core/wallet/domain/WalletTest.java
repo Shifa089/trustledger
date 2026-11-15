@@ -405,4 +405,45 @@ class WalletTest {
                     .isInstanceOf(UnsupportedOperationException.class);
         }
     }
+
+    @Nested
+    class LedgerLink {
+
+        @Test
+        void linksOnceAndTouches() {
+            Wallet wallet = wallet();
+            UUID account = UUID.randomUUID();
+
+            assertThat(wallet.linkLedgerAccount(account, T1)).isTrue();
+
+            assertThat(wallet.getLedgerAccountId()).isEqualTo(account);
+            assertThat(wallet.getUpdatedAt()).isEqualTo(T1);
+        }
+
+        @Test
+        void linkingTheSameAccountAgainChangesNothing() {
+            Wallet wallet = wallet();
+            UUID account = UUID.randomUUID();
+            wallet.linkLedgerAccount(account, T0);
+
+            assertThat(wallet.linkLedgerAccount(account, T1)).isFalse();
+            assertThat(wallet.getUpdatedAt()).isEqualTo(T0);
+        }
+
+        @Test
+        void anotherAccountIsABug() {
+            Wallet wallet = wallet();
+            UUID account = UUID.randomUUID();
+            wallet.linkLedgerAccount(account, T0);
+
+            assertThatThrownBy(() -> wallet.linkLedgerAccount(UUID.randomUUID(), T1))
+                    .isInstanceOf(IllegalStateException.class);
+            assertThat(wallet.getLedgerAccountId()).isEqualTo(account);
+        }
+
+        @Test
+        void accountIsRequired() {
+            assertThatNullPointerException().isThrownBy(() -> wallet().linkLedgerAccount(null, T1));
+        }
+    }
 }

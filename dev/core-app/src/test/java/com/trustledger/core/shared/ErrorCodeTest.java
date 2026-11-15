@@ -26,6 +26,7 @@ class ErrorCodeTest {
             "KYC_DOCUMENTS_MISSING, 409",
             "CONCURRENT_MODIFICATION, 409",
             "WALLET_FROZEN, 409",
+            "DUPLICATE_POSTING, 409",
             "DOCUMENT_TOO_LARGE, 413",
             "UNSUPPORTED_DOCUMENT_TYPE, 415",
             "INSUFFICIENT_FUNDS, 422",

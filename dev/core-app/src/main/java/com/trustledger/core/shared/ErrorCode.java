@@ -26,6 +26,8 @@ public enum ErrorCode {
     /** Someone else changed the same record first (optimistic lock); reload and retry. */
     CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "Concurrent modification"),
     WALLET_FROZEN(HttpStatus.CONFLICT, "Wallet frozen"),
+    /** The same business event (or the reversal of an entry) was already posted to the ledger. */
+    DUPLICATE_POSTING(HttpStatus.CONFLICT, "Duplicate posting"),
     /** Uploaded file larger than the configured maximum (5 MB for KYC documents). */
     DOCUMENT_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "Document too large"),
     /** Uploaded file is not a PDF, JPEG or PNG by its magic bytes (the client's Content-Type is ignored). */
