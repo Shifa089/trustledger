@@ -31,3 +31,12 @@ trustledger:
       allowed-origins:
         - http://localhost:5173
     swagger-public: true
+  # LocalStack from infra/docker-compose.yml. "test"/"test" are LocalStack's dummy credentials, not secrets.
+  kyc:
+    storage:
+      bucket: trustledger-kyc-local
+      endpoint: http://localhost:4566
+      path-style: true
+      access-key: test
+      secret-key: test
+      create-bucket: true

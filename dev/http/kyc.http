@@ -1,0 +1,99 @@
+### Full KYC and compliance review (FR-KYC-2 to FR-KYC-4). Fake test data only.
+# Prerequisites: run the token requests in auth.http (customer1, officer1, officer2) and the
+# customer1 minimum-KYC request there. Infra: postgres, redis, keycloak and localstack from compose.
+
+### customer1: full KYC details -> 201 {status SUBMITTED, requiredDocuments [PAN_CARD, ADDRESS_PROOF]}
+# Second run -> 409 KYC_ALREADY_SUBMITTED. Without minimum KYC -> 403 KYC_REQUIRED.
+POST {{api}}/api/v1/kyc/full
+Authorization: Bearer {{customer1_token}}
+Content-Type: application/json
+
+{"address": "12 Test Street, Indiranagar, Bengaluru 560038"}
+
+> {% client.global.set("kyc_case_id", response.body.id); %}
+
+### customer1: upload the PAN card (any small PNG/JPG/PDF of your own test image) -> 201 {sha256, contentType}
+# The type is detected from the file's first bytes, not from its name or Content-Type.
+POST {{api}}/api/v1/kyc/cases/{{kyc_case_id}}/documents
+Authorization: Bearer {{customer1_token}}
+Content-Type: multipart/form-data; boundary=kyc
+
+--kyc
+Content-Disposition: form-data; name="type"
+
+PAN_CARD
+--kyc
+Content-Disposition: form-data; name="file"; filename="pan.png"
+Content-Type: image/png
+
+< ./samples/fake-pan.png
+--kyc--
+
+> {% client.global.set("kyc_doc_id", response.body.id); %}
+
+### customer1: upload the address proof -> 201
+POST {{api}}/api/v1/kyc/cases/{{kyc_case_id}}/documents
+Authorization: Bearer {{customer1_token}}
+Content-Type: multipart/form-data; boundary=kyc
+
+--kyc
+Content-Disposition: form-data; name="type"
+
+ADDRESS_PROOF
+--kyc
+Content-Disposition: form-data; name="file"; filename="address.pdf"
+Content-Type: application/pdf
+
+< ./samples/fake-address.pdf
+--kyc--
+
+### customer1: a text file renamed to .pdf -> 415 UNSUPPORTED_DOCUMENT_TYPE
+POST {{api}}/api/v1/kyc/cases/{{kyc_case_id}}/documents
+Authorization: Bearer {{customer1_token}}
+Content-Type: multipart/form-data; boundary=kyc
+
+--kyc
+Content-Disposition: form-data; name="type"
+
+PHOTO
+--kyc
+Content-Disposition: form-data; name="file"; filename="not-really.pdf"
+Content-Type: application/pdf
+
+this is plain text, not a PDF
+--kyc--
+
+### officer1: the queue -> 200 {items: [...], page, size, totalElements, totalPages}
+GET {{api}}/api/v1/compliance/kyc-cases?status=SUBMITTED&page=0&size=20
+Authorization: Bearer {{officer1_token}}
+
+### officer1: case detail (address in clear, document list)
+GET {{api}}/api/v1/compliance/kyc-cases/{{kyc_case_id}}
+Authorization: Bearer {{officer1_token}}
+
+### officer1: presigned link to the PAN card, valid 5 minutes -> 200 {url, expiresAt}
+GET {{api}}/api/v1/compliance/kyc-cases/{{kyc_case_id}}/documents/{{kyc_doc_id}}
+Authorization: Bearer {{officer1_token}}
+
+### officer1 (maker): verify -> 200 VERIFIED
+POST {{api}}/api/v1/compliance/kyc-cases/{{kyc_case_id}}/verify
+Authorization: Bearer {{officer1_token}}
+
+### officer1 again as checker -> 409 MAKER_CHECKER_VIOLATION
+POST {{api}}/api/v1/compliance/kyc-cases/{{kyc_case_id}}/approve
+Authorization: Bearer {{officer1_token}}
+
+### officer2 (checker): approve -> 200 APPROVED; publishes KycLevelUpgraded(FULL)
+POST {{api}}/api/v1/compliance/kyc-cases/{{kyc_case_id}}/approve
+Authorization: Bearer {{officer2_token}}
+
+### customer1: now FULL
+GET {{api}}/api/v1/kyc/me
+Authorization: Bearer {{customer1_token}}
+
+### officer2: reject without a reason -> 400 (on a SUBMITTED or VERIFIED case, with a reason -> 200 REJECTED)
+POST {{api}}/api/v1/compliance/kyc-cases/{{kyc_case_id}}/reject
+Authorization: Bearer {{officer2_token}}
+Content-Type: application/json
+
+{}

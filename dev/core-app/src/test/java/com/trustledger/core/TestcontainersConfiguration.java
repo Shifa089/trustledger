@@ -5,6 +5,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.localstack.LocalStackContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -15,6 +16,9 @@ import org.testcontainers.utility.DockerImageName;
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
+
+    /** Must match trustledger.kyc.storage.bucket in src/test/resources/config/application.yml. */
+    public static final String KYC_BUCKET = "trustledger-kyc-test";
 
     @Bean
     @ServiceConnection
@@ -38,5 +42,25 @@ public class TestcontainersConfiguration {
     DynamicPropertyRegistrar keycloakProperties(KeycloakContainer keycloak) {
         return registry -> registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri",
                 keycloak::issuerUri);
+    }
+
+    /**
+     * S3 for KYC documents; same image as infra/docker-compose.yml. LocalStack skips presigned-URL signature
+     * and expiry checks by default; turned on here so tests see what real S3 does with a tampered or expired link.
+     */
+    @Bean
+    LocalStackContainer localStackContainer() {
+        return new LocalStackContainer(DockerImageName.parse("localstack/localstack:4.14")).withServices("s3")
+                .withEnv("S3_SKIP_SIGNATURE_VALIDATION", "0");
+    }
+
+    @Bean
+    DynamicPropertyRegistrar localStackProperties(LocalStackContainer localStack) {
+        return registry -> {
+            registry.add("trustledger.kyc.storage.endpoint", () -> localStack.getEndpoint().toString());
+            registry.add("trustledger.kyc.storage.region", localStack::getRegion);
+            registry.add("trustledger.kyc.storage.access-key", localStack::getAccessKey);
+            registry.add("trustledger.kyc.storage.secret-key", localStack::getSecretKey);
+        };
     }
 }

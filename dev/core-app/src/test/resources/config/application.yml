@@ -9,3 +9,11 @@ trustledger:
     cors:
       allowed-origins:
         - http://localhost:5173
+  # LocalStack (TestcontainersConfiguration supplies endpoint, region and its dummy credentials).
+  # Static here, not in the DynamicPropertyRegistrar: @ConditionalOnProperty on the bucket initializer is
+  # evaluated before the registrar beans exist, so a dynamic create-bucket=true would come too late.
+  kyc:
+    storage:
+      bucket: trustledger-kyc-test
+      path-style: true
+      create-bucket: true

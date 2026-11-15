@@ -4,6 +4,12 @@ spring:
   threads:
     virtual:
       enabled: true
+  # Slightly above the 5 MB document limit, so the service's exact check (and its 413 ProblemDetail)
+  # decides; anything bigger is cut off by the container before it is read into memory.
+  servlet:
+    multipart:
+      max-file-size: 6MB
+      max-request-size: 7MB
   jpa:
     open-in-view: false
     hibernate:
@@ -43,6 +49,20 @@ trustledger:
   # Minimum age for KYC (FR-KYC-1), counted in Asia/Kolkata. Startup fails below 18.
   kyc:
     min-age-years: 18
+    # FR-KYC-2. max-size is capped at 5MB (startup fails above; the database checks it too).
+    # view-link-ttl: lifetime of an officer's presigned download link, at most 5 minutes.
+    documents:
+      max-size: 5MB
+      max-per-case: 10
+      required-types: [PAN_CARD, ADDRESS_PROOF]
+      view-link-ttl: 5m
+    # S3 bucket for KYC documents (ADR 0011). In AWS: no endpoint, credentials from the task role, and the
+    # bucket comes from Terraform. The local profile points at LocalStack and creates the bucket.
+    storage:
+      bucket: ${TRUSTLEDGER_KYC_BUCKET:trustledger-kyc-documents}
+      region: ${AWS_REGION:ap-south-1}
+      path-style: false
+      create-bucket: false
   # Per-user budgets in Redis (Bucket4j), keyed by the token subject. 429 RATE_LIMITED when exceeded.
   # Money endpoints use their own, smaller bucket. If Redis is unreachable requests are allowed (fail open).
   rate-limit:

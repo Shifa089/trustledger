@@ -196,6 +196,19 @@ public class KycCase {
         touch(now);
     }
 
+    /**
+     * Documents can be attached to a FULL case only while it waits for the maker (SUBMITTED). Once an officer
+     * has verified it, the evidence is frozen: a later upload would bypass the review.
+     */
+    public void requireAcceptsDocuments() {
+        requireLevel(KycLevel.FULL, "add documents to");
+        requireStatus(KycStatus.SUBMITTED, "add documents to");
+    }
+
+    public boolean isOwnedBy(UUID candidateUserId) {
+        return userId.equals(candidateUserId);
+    }
+
     public boolean isApproved() {
         return status == KycStatus.APPROVED;
     }

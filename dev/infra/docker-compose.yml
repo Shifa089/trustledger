@@ -107,6 +107,8 @@ services:
       - "4566:4566"
     environment:
       SERVICES: s3,kms
+      # Validate presigned-URL signatures and expiry like real S3 (LocalStack skips this by default).
+      S3_SKIP_SIGNATURE_VALIDATION: "0"
     volumes:
       - localstack-data:/var/lib/localstack
     healthcheck:
