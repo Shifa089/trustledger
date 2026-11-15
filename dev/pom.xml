@@ -43,6 +43,8 @@
         <springdoc.version>3.2.0</springdoc.version>
         <!-- Rate limiting (CLAUDE.md stack). 8.21.0: newest release older than two weeks on Day 4. -->
         <bucket4j.version>8.21.0</bucket4j.version>
+        <!-- KYC document storage in S3 (ADR 0011). 2.56.0: released 2026-10-14, a month before Day 5. -->
+        <aws-sdk.version>2.56.0</aws-sdk.version>
     </properties>
 
     <dependencyManagement>
@@ -71,6 +73,13 @@
                 <groupId>org.springframework.modulith</groupId>
                 <artifactId>spring-modulith-bom</artifactId>
                 <version>${spring-modulith.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws-sdk.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

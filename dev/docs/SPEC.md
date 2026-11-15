@@ -227,7 +227,7 @@ One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`,
 | `identity.users` | `id`, `keycloak_subject`, `email_enc`, `email_hash`, `phone_enc`, `phone_hash`, `full_name_enc`, `status` (ACTIVE, ERASED) | `keycloak_subject` unique; `phone_hash` unique (HMAC blind index for lookups on encrypted data) |
 | `identity.consents` | `id`, `user_id`, `purpose` (TERMS, PRIVACY, MARKETING), `policy_version`, `granted`, `captured_at`, `ip` | Append-only history; the latest row per purpose wins |
 | `kyc.kyc_cases` | `id`, `user_id`, `level` (MIN, FULL), `status` (SUBMITTED, VERIFIED, APPROVED, REJECTED), `full_name_enc` (name as on PAN), `pan_enc`, `pan_hash`, `dob_enc`, `address_enc`, `verified_by`/`_at`, `approved_by`/`_at`, `rejected_by`/`_at`, `rejection_reason` | Check: `approved_by IS NULL OR approved_by <> verified_by` (maker-checker in the database too); a FULL case is APPROVED only with both officers; reason iff REJECTED; one live (non-rejected) case per user and level |
-| `kyc.kyc_documents` | `id`, `case_id`, `doc_type`, `s3_key`, `content_type`, `size_bytes`, `sha256` | Size at most 5 MB; files live in S3, never in the database |
+| `kyc.kyc_documents` | `id`, `case_id`, `doc_type` (PAN_CARD, ADDRESS_PROOF, PHOTO), `s3_key`, `content_type` (from magic bytes), `size_bytes`, `sha256`, `uploaded_by` | Size 1 byte to 5 MB; content type PDF/JPEG/PNG; `sha256` 64 lower-case hex; `s3_key` unique; FK to `kyc_cases` (same schema). Files live in S3 (SSE-S3), never in the database; no file names stored |
 | `wallet.wallets` | `id`, `user_id`, `tier` (MIN, FULL), `status` (ACTIVE, FROZEN, CLOSED), `balance_minor`, `held_minor`, `currency`, `ledger_account_id`, `version` | `user_id` unique; checks `balance_minor >= 0`, `held_minor >= 0`, `held_minor <= balance_minor` |
 | `wallet.wallet_freezes` | `id`, `wallet_id`, `source` (COMPLIANCE, AML), `reason`, `frozen_by`, `frozen_at`, `unfrozen_by`, `unfrozen_at` | Freeze history for audits |
 | `ledger.ledger_accounts` | `id`, `code`, `type` (ASSET, LIABILITY, REVENUE), `normal_side` (DEBIT, CREDIT), `currency` | `code` unique, for example `WALLET:<walletId>`, `PLATFORM:GATEWAY_CLEARING` |
@@ -283,13 +283,14 @@ All endpoints sit under `/api/v1` (path versioning configured with Spring Framew
 | GET, POST | `/me/consents` | CUSTOMER | Read or record consent |
 | POST | `/kyc/min` | CUSTOMER | Minimum KYC |
 | POST | `/kyc/full` | CUSTOMER | Full KYC details; returns case ID |
-| POST | `/kyc/cases/{id}/documents` | CUSTOMER (owner) | Multipart upload |
+| POST | `/kyc/cases/{id}/documents` | CUSTOMER (owner) | Multipart `file` + `type`; only while SUBMITTED; another user's case is 404 |
 | GET | `/kyc/me` | CUSTOMER | Own KYC status |
-| GET | `/compliance/kyc-cases?status=` | COMPLIANCE\_OFFICER | Paginated queue |
-| POST | `/compliance/kyc-cases/{id}/verify` | COMPLIANCE\_OFFICER | Maker step |
+| GET | `/compliance/kyc-cases?status=&page=&size=` | COMPLIANCE\_OFFICER | Paginated queue of FULL cases, oldest first; no personal data |
+| GET | `/compliance/kyc-cases/{id}` | COMPLIANCE\_OFFICER | Case detail: address and document metadata |
+| POST | `/compliance/kyc-cases/{id}/verify` | COMPLIANCE\_OFFICER | Maker step; needs every required document type |
 | POST | `/compliance/kyc-cases/{id}/approve` | COMPLIANCE\_OFFICER | Checker step; must differ from the maker |
 | POST | `/compliance/kyc-cases/{id}/reject` | COMPLIANCE\_OFFICER | Reason required |
-| GET | `/compliance/kyc-cases/{id}/documents/{docId}` | COMPLIANCE\_OFFICER | Short-lived S3 presigned URL; access is audited |
+| GET | `/compliance/kyc-cases/{id}/documents/{docId}` | COMPLIANCE\_OFFICER | S3 presigned URL valid 5 minutes (`{url, expiresAt}`); access is logged, audited from M10 |
 | GET | `/wallets/me` | CUSTOMER | Balance, held, available, tier, limits used |
 | GET | `/wallets/me/transactions` | CUSTOMER | `from`, `to`, `type`, `page`, `size`, `sort` |
 | GET | `/wallets/me/statements/{yyyy-MM}` | CUSTOMER | PDF |
@@ -345,9 +346,11 @@ All endpoints sit under `/api/v1` (path versioning configured with Spring Framew
 | UNAUTHENTICATED / ACCESS\_DENIED / KYC\_REQUIRED | 401 / 403 / 403 |
 | NOT\_FOUND | 404 |
 | REQUEST\_IN\_PROGRESS / MAKER\_CHECKER\_VIOLATION / WALLET\_FROZEN | 409 |
+| INVALID\_STATE\_TRANSITION / KYC\_ALREADY\_SUBMITTED / KYC\_DOCUMENTS\_MISSING / CONCURRENT\_MODIFICATION | 409 |
+| DOCUMENT\_TOO\_LARGE / UNSUPPORTED\_DOCUMENT\_TYPE | 413 / 415 |
 | INSUFFICIENT\_FUNDS / LIMIT\_EXCEEDED / IDEMPOTENCY\_KEY\_REUSED | 422 |
 | RATE\_LIMITED | 429 |
-| GATEWAY\_UNAVAILABLE | 503 |
+| GATEWAY\_UNAVAILABLE / STORAGE\_UNAVAILABLE | 503 |
 
 ## 6. Cross-cutting conventions
 

@@ -21,13 +21,23 @@ public enum ErrorCode {
     INVALID_STATE_TRANSITION(HttpStatus.CONFLICT, "Invalid state transition"),
     KYC_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "KYC already submitted"),
     PHONE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "Phone number already registered"),
+    /** A FULL KYC case cannot be verified before every required document type is uploaded. */
+    KYC_DOCUMENTS_MISSING(HttpStatus.CONFLICT, "KYC documents missing"),
+    /** Someone else changed the same record first (optimistic lock); reload and retry. */
+    CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "Concurrent modification"),
     WALLET_FROZEN(HttpStatus.CONFLICT, "Wallet frozen"),
+    /** Uploaded file larger than the configured maximum (5 MB for KYC documents). */
+    DOCUMENT_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "Document too large"),
+    /** Uploaded file is not a PDF, JPEG or PNG by its magic bytes (the client's Content-Type is ignored). */
+    UNSUPPORTED_DOCUMENT_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported document type"),
     INSUFFICIENT_FUNDS(HttpStatus.UNPROCESSABLE_CONTENT, "Insufficient funds"),
     LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_CONTENT, "Limit exceeded"),
     IDEMPOTENCY_KEY_REUSED(HttpStatus.UNPROCESSABLE_CONTENT, "Idempotency key reused"),
     AGE_REQUIREMENT_NOT_MET(HttpStatus.UNPROCESSABLE_CONTENT, "Age requirement not met"),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Too many requests"),
     GATEWAY_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Payment gateway unavailable"),
+    /** Document storage (S3) could not be reached or refused the request. */
+    STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Document storage unavailable"),
     /** Endpoint declared but not built yet (stubs such as POST /transfers until M6). */
     NOT_IMPLEMENTED(HttpStatus.NOT_IMPLEMENTED, "Not implemented"),
     /** Framework-level 405/406/415; the handler keeps the framework's actual status. */

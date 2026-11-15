@@ -9,6 +9,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSourceResolvable;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -58,6 +59,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .map(v -> new Violation(v.getPropertyPath().toString(), v.getMessage()))
                 .toList();
         return respond(validationProblem(violations, request.getRequestURI()));
+    }
+
+    /** Two requests changed the same row; the loser gets a retryable 409 instead of a 500. */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ResponseEntity<ProblemDetail> handleOptimisticLock(OptimisticLockingFailureException ex,
+            HttpServletRequest request) {
+        log.info("Request lost an optimistic-lock race");
+        return respond(problem(ErrorCode.CONCURRENT_MODIFICATION,
+                "The record was changed by another request. Reload it and try again.", request.getRequestURI()));
     }
 
     @ExceptionHandler(AuthenticationException.class)
@@ -125,6 +135,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case 401 -> ErrorCode.UNAUTHENTICATED;
             case 403 -> ErrorCode.ACCESS_DENIED;
             case 404 -> ErrorCode.NOT_FOUND;
+            // Only multipart uploads over spring.servlet.multipart.max-file-size end up here.
+            case 413 -> ErrorCode.DOCUMENT_TOO_LARGE;
             default -> status.is5xxServerError() ? ErrorCode.INTERNAL_ERROR : ErrorCode.UNSUPPORTED_REQUEST;
         };
     }
