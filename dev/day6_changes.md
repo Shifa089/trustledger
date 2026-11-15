@@ -22,15 +22,27 @@ Decisions approved in the plan:
 
 ### 1. How to verify Day 6
 
-Run these from `dev/`. Start **Docker Desktop** first.
+Run these from `dev/`. Start **Docker Desktop** first. Every cell holds exactly **one** command; paste them one at a time.
+
+> **PowerShell:** put every `-D...` argument that contains a dot in double quotes, as below. Without the quotes
+> PowerShell splits `-Dit.test=...` at the dot and Maven fails with *Unknown lifecycle phase ".test=..."*.
 
 | # | Command | Why it is necessary |
 |---|---|---|
 | 1 | `./mvnw clean verify` | Full build: 543 core-app unit tests, 318 core-app ITs (PostgreSQL, Redis, Keycloak and LocalStack in Testcontainers), AML IT, Modulith check, JaCoCo. Same as CI. |
-| 2 | `./mvnw -pl core-app verify -DskipUnitTests -Dit.test='Wallet*IT,SecurityMatrixIT'` | Just the wallet ITs and the security matrix. |
+| 2 | `./mvnw -pl core-app verify -DskipUnitTests "-Dit.test=Wallet*IT,SecurityMatrixIT"` | Just the wallet ITs and the security matrix (163 tests, about 2 minutes). |
 | 3 | `./mvnw install -DskipTests` (needed once: core-app has a new dependency) | So `-pl core-app` runs resolve `spring-modulith-events-api`. |
-| 4 | `docker compose -f infra/docker-compose.yml up -d postgres redis keycloak localstack`, then `./mvnw -pl core-app spring-boot:run -Dspring-boot.run.profiles=local` | Flyway applies **V5** and **V6**. |
-| 5 | Run `http/auth.http` (tokens, then customer1's minimum KYC), then `http/wallet.http` top to bottom | `/wallets/me` shows the MIN wallet. officer1 freezes it, and the customer sees FROZEN. A second freeze gives 409. The customer trying to freeze gets 403. officer2 unfreezes. An unknown wallet gives 404. |
+| 4a | `docker compose -f infra/docker-compose.yml up -d postgres redis keycloak localstack` | Starts the local infrastructure. |
+| 4b | `./mvnw -pl core-app spring-boot:run "-Dspring-boot.run.profiles=local"` (in a **second** terminal; it keeps running) | Flyway applies **V5** and **V6**. Wait for `Started TrustLedgerApplication`. |
+| 5 | In **IntelliJ IDEA**: open `http/auth.http`, pick the **local** environment at the top of the editor, and click the green ▶ next to each request: the customer1 token, customer1's minimum KYC, then the officer1 and officer2 tokens. Then open `http/wallet.http` and run its requests top to bottom. | `/wallets/me` shows the MIN wallet. officer1 freezes it, and the customer sees FROZEN. A second freeze gives 409. The customer trying to freeze gets 403. officer2 unfreezes. An unknown wallet gives 404. |
+
+`.http` files are request collections for the IntelliJ HTTP Client, not programs. Typing `http/wallet.http` in PowerShell only
+opens the file in its default app (a browser shows the text). Before step 5, once:
+- Copy `http/http-client.private.env.json.example` to `http/http-client.private.env.json` (git-ignored) and put the
+  `TRUSTLEDGER_DEV_USER_PASSWORD` value from `.env` in it.
+- officer1 and officer2 need a fresh 6-digit TOTP code in `@otp` (see the top of `auth.http`); each code works once.
+- customer1's minimum KYC can be submitted only once per database. If it was done already, its request gives 409 and the
+  wallet already exists, so continue with `wallet.http`.
 | 6 | Finish `http/kyc.http` (officer2 approves full KYC), then `GET /wallets/me` again | Same `walletId`, but `tier` is now FULL and `dailyTransfer` is `"100000.00"`. |
 | 7 | `docker compose -f infra/docker-compose.yml exec postgres psql -U trustledger -d trustledger -c "select source, frozen_by, frozen_at, unfrozen_by, unfrozen_at from wallet.wallet_freezes"` | The freeze history, with one closed row. |
 
