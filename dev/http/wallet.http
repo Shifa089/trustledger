@@ -1,0 +1,43 @@
+### Wallet (FR-W-1 to FR-W-3). Fake test data only.
+# Prerequisites: run the token requests in auth.http (customer1, officer1, officer2) and the customer1
+# minimum-KYC request there. The KycLevelUpgraded listener has then opened customer1's MIN wallet.
+
+### customer1: own wallet -> 200 {tier MIN, balance "0.00", limits.maxBalance "10000.00", p2pAllowed false}
+# Before minimum KYC -> 403 KYC_REQUIRED. After officer2 approves full KYC (kyc.http) -> tier FULL.
+GET {{api}}/api/v1/wallets/me
+Authorization: Bearer {{customer1_token}}
+
+> {% client.global.set("wallet_id", response.body.walletId); %}
+
+### officer1: freeze customer1's wallet -> 200 {status FROZEN, currentFreeze {source COMPLIANCE, reason}}
+# Second run -> 409 INVALID_STATE_TRANSITION. Without a reason -> 400.
+POST {{api}}/api/v1/compliance/wallets/{{wallet_id}}/freeze
+Authorization: Bearer {{officer1_token}}
+Content-Type: application/json
+
+{"reason": "Test freeze: bank reported unusual activity"}
+
+### customer1: own wallet -> status FROZEN
+GET {{api}}/api/v1/wallets/me
+Authorization: Bearer {{customer1_token}}
+
+### customer1 can't freeze anything -> 403
+POST {{api}}/api/v1/compliance/wallets/{{wallet_id}}/freeze
+Authorization: Bearer {{customer1_token}}
+Content-Type: application/json
+
+{"reason": "nope"}
+
+### officer2: unfreeze -> 200 {status ACTIVE, currentFreeze null}. Running again -> 409.
+POST {{api}}/api/v1/compliance/wallets/{{wallet_id}}/unfreeze
+Authorization: Bearer {{officer2_token}}
+Content-Type: application/json
+
+{"reason": "Test unfreeze: cleared after review"}
+
+### Unknown wallet -> 404
+POST {{api}}/api/v1/compliance/wallets/00000000-0000-7000-8000-000000000001/freeze
+Authorization: Bearer {{officer1_token}}
+Content-Type: application/json
+
+{"reason": "x"}
