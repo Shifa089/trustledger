@@ -174,8 +174,8 @@ trustledger/
 │       ├── shared/        # Money, error codes, security helpers, crypto, web config (open module)
 │       ├── identity/      # users, consents, JIT provisioning
 │       ├── kyc/           # KYC cases, documents, maker-checker
-│       ├── wallet/        # wallets, limits, freeze
-│       ├── ledger/        # accounts, journal entries, reconciliation
+│       ├── wallet/        # wallets, limits, freeze, reconciliation (FR-L-4)
+│       ├── ledger/        # accounts, journal entries, balances
 │       ├── payments/      # transfers, top-ups, webhooks, idempotency
 │       ├── audit/         # hash-chained audit log
 │       ├── privacy/       # data export, erasure
@@ -218,7 +218,7 @@ Spring Modulith treats a module's base package as its public API and its sub-pac
 
 ## 4. Domain model and database schema
 
-One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`, `ledger`, `payments`, `audit`, `privacy`, `notification`) plus a separate `aml` schema owned by the AML service. Money is stored as `bigint` paise, IDs are UUIDs, and timestamps are `timestamptz` in UTC.
+One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`, `ledger`, `payments`, `audit`, `privacy`, `notification`) plus `shared` (only the ShedLock table, ADR 0013) and a separate `aml` schema owned by the AML service. Money is stored as `bigint` paise, IDs are UUIDs, and timestamps are `timestamptz` in UTC.
 
 **Core tables** (every table also has `created_at`; mutable tables have `updated_at` and `version` for optimistic locking)
 
@@ -233,6 +233,7 @@ One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`,
 | `ledger.ledger_accounts` | `id`, `code`, `type` (ASSET, LIABILITY, REVENUE), `normal_side` (DEBIT, CREDIT), `currency` | `code` unique, for example `WALLET:<walletId>`, `PLATFORM:GATEWAY_CLEARING`; ASSET iff DEBIT normal side. `PLATFORM:GATEWAY_CLEARING` (asset) and `PLATFORM:SUSPENSE` (liability) are seeded by migration. A wallet's account is opened by the **wallet** module through `LedgerApi` when it handles `WalletCreated`, so the ledger depends on no other module |
 | `ledger.journal_entries` | `id`, `entry_type` (TOPUP, P2P\_TRANSFER, REVERSAL), `reference_type`, `reference_id`, `reverses_entry_id`, `reason`, `posted_at` | Unique (`reference_type`, `reference_id`, `entry_type`) so the same business event can't be posted twice; `reverses_entry_id` unique (reversed at most once); `reverses_entry_id` and `reason` set iff REVERSAL. A reversal's reference is (`JOURNAL_ENTRY`, original ID) |
 | `ledger.journal_lines` | `id`, `entry_id`, `account_id`, `direction` (DEBIT, CREDIT), `amount_minor`, `line_no` | Check `amount_minor > 0`; index on (`account_id`, `entry_id`) |
+| `shared.shedlock` | `name`, `lock_until`, `locked_at`, `locked_by` | ShedLock's lock table (ADR 0013): one row per scheduled job, e.g. `wallet-reconciliation`. Times come from the database clock |
 | `payments.transfers` | `id`, `sender_wallet_id`, `receiver_wallet_id`, `amount_minor`, `note`, `status` (INITIATED, HELD\_FOR\_REVIEW, COMPLETED, REJECTED, FAILED, REVERSED), `journal_entry_id`, `reviewed_by`, `version` | Index on (`sender_wallet_id`, `created_at`) for limit checks and history |
 | `payments.topups` | `id`, `wallet_id`, `amount_minor`, `gateway_order_id`, `gateway_payment_id`, `status` (CREATED, PENDING, CAPTURED, FAILED, EXPIRED), `journal_entry_id`, `version` | `gateway_order_id` unique |
 | `payments.webhook_events` | `id`, `gateway_event_id`, `event_type`, `payload` (jsonb), `signature_valid`, `processed_at` | `gateway_event_id` unique (de-duplication) |

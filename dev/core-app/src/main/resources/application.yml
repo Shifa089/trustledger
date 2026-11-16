@@ -87,6 +87,18 @@ trustledger:
       - POST /api/*/transfers
       - POST /api/*/topups
     redis-timeout: 500ms
+  # Cron triggers for scheduled jobs (ADR 0013). false switches them off (tests); manual runs still work.
+  scheduling:
+    enabled: true
+  # FR-L-4: nightly wallet-vs-ledger check, 02:00 India time (6-field Spring cron). Also
+  # POST /api/v1/admin/reconciliation/run (ADMIN). Mismatches: WARN log + trustledger.reconciliation.mismatches.
+  reconciliation:
+    cron: "0 0 2 * * *"
+    zone: Asia/Kolkata
+    batch-size: 500
+    max-listed-mismatches: 1000
+    lock-at-most-for: 30m
+    lock-at-least-for: 1m
 
 ---
 # Every profile except local: structured JSON console logs (Elastic Common Schema).

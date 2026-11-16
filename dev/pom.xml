@@ -45,6 +45,9 @@
         <bucket4j.version>8.21.0</bucket4j.version>
         <!-- KYC document storage in S3 (ADR 0011). 2.56.0: released 2026-10-14, a month before Day 5. -->
         <aws-sdk.version>2.56.0</aws-sdk.version>
+        <!-- Scheduled-job lock (ADR 0013). 7.10.1: released 2026-09-08, built against Spring 7.0 / Boot 4.1;
+             7.11.0 was under two weeks old on Day 8. -->
+        <shedlock.version>7.10.1</shedlock.version>
     </properties>
 
     <dependencyManagement>
@@ -80,6 +83,13 @@
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>bom</artifactId>
                 <version>${aws-sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>net.javacrumbs.shedlock</groupId>
+                <artifactId>shedlock-bom</artifactId>
+                <version>${shedlock.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

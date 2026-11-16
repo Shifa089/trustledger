@@ -83,6 +83,15 @@
             <groupId>com.bucket4j</groupId>
             <artifactId>bucket4j_jdk17-lettuce</artifactId>
         </dependency>
+        <!-- One run of a scheduled job across all instances (ADR 0013): the lock is a row in shared.shedlock. -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-provider-jdbc-template</artifactId>
+        </dependency>
         <!-- KYC documents in S3 (ADR 0011): only the S3 module, with the JDK-based HTTP client
              instead of Apache/Netty. -->
         <dependency>

@@ -1,0 +1,21 @@
+### Admin (FR-L-4). Fake test data only.
+# Prerequisites: run "admin1: token" in auth.http (needs a fresh TOTP code) and "customer1: token".
+
+### admin1: run reconciliation now -> 200
+# {walletsChecked, mismatches, unlinked, listed: [{walletId, reason BALANCE|UNLINKED, currency, cachedBalance,
+#  ledgerBalance}], truncated, startedAt, finishedAt}. Mismatches are also logged at WARN and counted in
+# /actuator/metrics/trustledger.reconciliation.mismatches. Wallets created before V7 show up as UNLINKED.
+# While another run holds the lock -> 409 REQUEST_IN_PROGRESS.
+POST {{api}}/api/v1/admin/reconciliation/run
+Authorization: Bearer {{admin1_token}}
+
+### admin1: the mismatch counter (by reason)
+GET {{api}}/actuator/metrics/trustledger.reconciliation.mismatches
+Authorization: Bearer {{admin1_token}}
+
+### customer1 can't run it -> 403 ProblemDetail (ACCESS_DENIED)
+POST {{api}}/api/v1/admin/reconciliation/run
+Authorization: Bearer {{customer1_token}}
+
+### No token -> 401
+POST {{api}}/api/v1/admin/reconciliation/run
