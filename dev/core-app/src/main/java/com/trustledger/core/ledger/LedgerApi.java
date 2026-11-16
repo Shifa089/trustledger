@@ -1,6 +1,8 @@
 package com.trustledger.core.ledger;
 
+import java.util.Collection;
 import java.util.Currency;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -33,6 +35,12 @@ public interface LedgerApi {
 
     /** The balance derived from the journal lines of the account with this code. */
     AccountBalance balanceOf(String accountCode);
+
+    /**
+     * {@link #balanceOf} for many accounts at once (reconciliation), keyed by account code. Unknown codes are
+     * absent from the map instead of failing the whole call.
+     */
+    Map<String, AccountBalance> balancesOf(Collection<String> accountCodes);
 
     /**
      * Opens {@code WALLET:<walletId>} (LIABILITY, credit normal side) if it doesn't exist yet. Idempotent.

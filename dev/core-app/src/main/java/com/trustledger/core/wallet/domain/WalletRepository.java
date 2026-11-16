@@ -24,6 +24,13 @@ public interface WalletRepository {
     /** The user's wallet, {@code SELECT ... FOR UPDATE}: a tier upgrade waits for a running transfer. */
     Optional<Wallet> lockByUserId(UUID userId);
 
+    /**
+     * Keyset paging for reconciliation: up to {@code limit} wallets with an ID above {@code afterId}, in ID
+     * order. Start with {@code new UUID(0, 0)}; pass the last ID of a page to get the next one. No OFFSET, so a
+     * page costs the same however far in it is.
+     */
+    List<WalletBalanceRow> balancesAfter(UUID afterId, int limit);
+
     /** Flushes at once, so the unique {@code user_id} (a second wallet) surfaces here and not at commit. */
     Wallet saveAndFlush(Wallet wallet);
 }

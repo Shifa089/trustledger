@@ -8,9 +8,15 @@ import com.trustledger.core.ledger.LedgerSql.Line;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,8 +26,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * FR-L-3 through {@link LedgerApi#reverse}. The original entries are written with raw SQL, so only the reversal
- * itself goes through {@code LedgerPostingService.post()}. <b>The tests that post a reversal fail until
- * {@code post()} is written</b>; the refusals that happen before posting pass today.
+ * itself goes through {@code LedgerPostingService.post()}.
  */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
@@ -88,6 +93,78 @@ class LedgerReversalIT {
         assertThat(jdbc.queryForObject("select count(*) from ledger.journal_entries where reverses_entry_id = ?",
                 Integer.class, original)).isEqualTo(1);
         assertThat(ledger.balanceOf(wallet).balanceMinor()).isZero();
+    }
+
+    /**
+     * Two admins reverse the same entry at the same moment: all pass the "already reversed?" check, and the
+     * unique reversal keys let exactly one insert win. The others get DUPLICATE_POSTING, not a raw SQL error.
+     */
+    @Test
+    void concurrentReversalsOfTheSameEntryReverseItExactlyOnce() throws Exception {
+        String wallet = walletAccount();
+        UUID original = topup(wallet, 9_000);
+        int threads = 8;
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<Object>> results = new ArrayList<>();
+
+        try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
+            for (int i = 0; i < threads; i++) {
+                int n = i;
+                results.add(pool.submit(() -> {
+                    start.await();
+                    try {
+                        return ledger.reverse(original, "Correction " + n);
+                    } catch (TrustLedgerException e) {
+                        return e.errorCode();
+                    }
+                }));
+            }
+            start.countDown();
+            List<Object> outcomes = new ArrayList<>();
+            for (Future<Object> result : results) {
+                outcomes.add(result.get(30, TimeUnit.SECONDS));
+            }
+
+            assertThat(outcomes).filteredOn(UUID.class::isInstance).hasSize(1);
+            assertThat(outcomes).filteredOn(ErrorCode.DUPLICATE_POSTING::equals).hasSize(threads - 1);
+        }
+        assertThat(jdbc.queryForObject("select count(*) from ledger.journal_entries where reverses_entry_id = ?",
+                Integer.class, original)).isEqualTo(1);
+        assertThat(ledger.balanceOf(wallet).balanceMinor()).isZero();
+    }
+
+    @Test
+    void multiLineEntryIsReversedLineByLineInTheSameOrder() {
+        String a = walletAccount();
+        String b = walletAccount();
+        UUID original = sql.post(Line.debit(sql.accountId(AccountCodes.GATEWAY_CLEARING), 500),
+                Line.credit(sql.accountId(a), 200), Line.credit(sql.accountId(b), 300));
+
+        UUID reversal = ledger.reverse(original, "Split posted to the wrong wallets");
+
+        List<Map<String, Object>> lines = jdbc.queryForList("""
+                select a.code, l.direction, l.amount_minor, l.line_no from ledger.journal_lines l
+                join ledger.ledger_accounts a on a.id = l.account_id where l.entry_id = ? order by l.line_no""",
+                reversal);
+        assertThat(lines).extracting(l -> l.get("code")).containsExactly(AccountCodes.GATEWAY_CLEARING, a, b);
+        assertThat(lines).extracting(l -> l.get("direction")).containsExactly("CREDIT", "DEBIT", "DEBIT");
+        assertThat(lines).extracting(l -> l.get("amount_minor")).containsExactly(500L, 200L, 300L);
+        assertThat(lines).extracting(l -> l.get("line_no")).containsExactly(1, 2, 3);
+        assertThat(ledger.balanceOf(a).balanceMinor()).isZero();
+        assertThat(ledger.balanceOf(b).balanceMinor()).isZero();
+    }
+
+    /** The debit-normal platform asset goes back to exactly where it was, like the credit-normal wallet. */
+    @Test
+    void reversalRestoresThePlatformAccountToo() {
+        long clearingBefore = ledger.balanceOf(AccountCodes.GATEWAY_CLEARING).balanceMinor();
+        UUID original = topup(walletAccount(), 12_345);
+        assertThat(ledger.balanceOf(AccountCodes.GATEWAY_CLEARING).balanceMinor())
+                .isEqualTo(clearingBefore + 12_345);
+
+        ledger.reverse(original, "Gateway refunded the payment");
+
+        assertThat(ledger.balanceOf(AccountCodes.GATEWAY_CLEARING).balanceMinor()).isEqualTo(clearingBefore);
     }
 
     @Test

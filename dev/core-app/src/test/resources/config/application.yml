@@ -12,6 +12,9 @@ trustledger:
   # LocalStack (TestcontainersConfiguration supplies endpoint, region and its dummy credentials).
   # Static here, not in the DynamicPropertyRegistrar: @ConditionalOnProperty on the bucket initializer is
   # evaluated before the registrar beans exist, so a dynamic create-bucket=true would come too late.
+  # No cron triggers in tests: ITs run reconciliation themselves, so a timed run can't interfere.
+  scheduling:
+    enabled: false
   kyc:
     storage:
       bucket: trustledger-kyc-test
