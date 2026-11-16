@@ -4,14 +4,20 @@ import com.trustledger.core.ledger.AccountBalance;
 import com.trustledger.core.ledger.AccountCodes;
 import com.trustledger.core.ledger.AccountType;
 import com.trustledger.core.ledger.Direction;
+import com.trustledger.core.ledger.domain.AccountSideTotal;
 import com.trustledger.core.ledger.domain.JournalLineRepository;
 import com.trustledger.core.ledger.domain.LedgerAccount;
 import com.trustledger.core.ledger.domain.LedgerAccountRepository;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.TrustLedgerException;
 import java.time.Clock;
+import java.util.Collection;
 import java.util.Currency;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,5 +79,34 @@ public class LedgerAccountService {
         long credits = lines.sumAmount(account.getId(), Direction.CREDIT);
         return new AccountBalance(account.getCode(), account.getNormalSide(), account.balanceFrom(debits, credits),
                 account.getCurrency());
+    }
+
+    /**
+     * {@link #balanceOf} for many accounts with two queries in total (accounts, then grouped line totals), for
+     * reconciliation. Unknown codes are simply absent from the result.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, AccountBalance> balancesOf(Collection<String> accountCodes) {
+        Objects.requireNonNull(accountCodes, "accountCodes");
+        if (accountCodes.isEmpty()) {
+            return Map.of();
+        }
+        List<LedgerAccount> found = accounts.findAllByCodeIn(Set.copyOf(accountCodes));
+        if (found.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, long[]> totals = new HashMap<>();
+        for (AccountSideTotal total : lines.sumByAccountAndDirection(
+                found.stream().map(LedgerAccount::getId).toList())) {
+            long[] debitsAndCredits = totals.computeIfAbsent(total.accountId(), id -> new long[2]);
+            debitsAndCredits[total.direction() == Direction.DEBIT ? 0 : 1] = total.totalMinor();
+        }
+        Map<String, AccountBalance> balances = new HashMap<>();
+        for (LedgerAccount account : found) {
+            long[] debitsAndCredits = totals.getOrDefault(account.getId(), new long[2]);
+            balances.put(account.getCode(), new AccountBalance(account.getCode(), account.getNormalSide(),
+                    account.balanceFrom(debitsAndCredits[0], debitsAndCredits[1]), account.getCurrency()));
+        }
+        return Map.copyOf(balances);
     }
 }

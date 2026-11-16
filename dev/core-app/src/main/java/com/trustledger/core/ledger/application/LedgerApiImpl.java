@@ -5,7 +5,9 @@ import com.trustledger.core.ledger.LedgerApi;
 import com.trustledger.core.ledger.PostingCommand;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.TrustLedgerException;
+import java.util.Collection;
 import java.util.Currency;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,11 @@ class LedgerApiImpl implements LedgerApi {
     @Override
     public AccountBalance balanceOf(String accountCode) {
         return accounts.balanceOf(accountCode);
+    }
+
+    @Override
+    public Map<String, AccountBalance> balancesOf(Collection<String> accountCodes) {
+        return accounts.balancesOf(accountCodes);
     }
 
     @Override

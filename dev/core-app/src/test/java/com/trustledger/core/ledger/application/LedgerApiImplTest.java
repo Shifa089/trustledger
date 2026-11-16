@@ -19,6 +19,7 @@ import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -67,9 +68,11 @@ class LedgerApiImplTest {
         when(reversals.reverse(entry, "why")).thenReturn(reversal);
         when(accounts.balanceOf("WALLET:x")).thenReturn(balance);
         when(accounts.openWalletAccount(wallet, Money.INR)).thenReturn(account);
+        when(accounts.balancesOf(List.of("WALLET:x"))).thenReturn(Map.of("WALLET:x", balance));
 
         assertThat(api.reverse(entry, "why")).isEqualTo(reversal);
         assertThat(api.balanceOf("WALLET:x")).isEqualTo(balance);
+        assertThat(api.balancesOf(List.of("WALLET:x"))).containsEntry("WALLET:x", balance);
         assertThat(api.openWalletAccount(wallet, Money.INR)).isEqualTo(account);
     }
 }
