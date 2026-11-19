@@ -4,7 +4,8 @@
  * The transfer flow (SPEC §4 "Transfer flow"): idempotency keys ({@code @Idempotent} endpoints,
  * {@code payments.idempotency_keys}), the {@code Transfer} aggregate, recipient resolution, daily and monthly
  * limit checks, and {@code TransferService}, which locks both wallets, posts to the ledger and publishes
- * {@link com.trustledger.core.payments.TransferCompleted}.
+ * {@link com.trustledger.core.payments.TransferCompleted}. High-value transfers are held and decided by a compliance
+ * officer through {@code HeldTransferService} (approve posts and publishes; reject releases the hold).
  * <p>
  * Payments depends on identity, wallet and ledger through their public APIs only
  * ({@link com.trustledger.core.identity.IdentityApi}, {@link com.trustledger.core.wallet.WalletApi},

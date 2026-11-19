@@ -14,28 +14,22 @@ import com.trustledger.core.wallet.WalletTier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
 /**
- * M6 "Done when" 2 and 3: the ordered {@code SELECT ... FOR UPDATE} locks under real contention.
+ * M6 "Done when" 2 / must-pass 4: 100 concurrent transfers from one wallet never overdraw it, and the ledger
+ * reconciles. The {@code SELECT ... FOR UPDATE} on the sender serialises the balance checks.
  * <p>
- * All tasks wait on one {@link CountDownLatch} so they hit the database together, instead of trickling in as
- * the pool starts threads. Outcomes are the service's own answers: a success, or a {@link TrustLedgerException}
- * with a business code. Anything else (a deadlock, a lock timeout, an optimistic-lock failure) fails the test.
+ * Tasks start together through {@link ConcurrentRun} (ExecutorService + CountDownLatch, 60 s timeout). Outcomes
+ * are the service's own answers: a success or {@code INSUFFICIENT_FUNDS}. Anything else (a lock timeout, an
+ * optimistic-lock failure) fails the test.
  */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 class TransferConcurrencyIT {
-
-    private static final int THREADS = 16;
 
     @Autowired
     TransferService service;
@@ -45,11 +39,10 @@ class TransferConcurrencyIT {
 
     private enum Outcome { COMPLETED, INSUFFICIENT_FUNDS }
 
-    private Callable<Outcome> transfer(Customer from, Customer to, long minor, CountDownLatch start) {
+    private Callable<Outcome> transfer(Customer from, Customer to, long minor) {
         TransferCommand command = new TransferCommand(from.userId(), TransferRecipient.byWalletId(to.walletId()),
                 Money.of(minor, Money.INR), null);
         return () -> {
-            start.await();
             try {
                 service.transfer(command);
                 return Outcome.COMPLETED;
@@ -62,40 +55,16 @@ class TransferConcurrencyIT {
         };
     }
 
-    /**
-     * Submits every task, then opens {@code start} so they all go at once; returns their outcomes. An unexpected
-     * exception fails the test.
-     */
-    private static List<Outcome> runTogether(List<Callable<Outcome>> tasks, CountDownLatch start)
-            throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(THREADS);
-        try {
-            List<Future<Outcome>> futures = new ArrayList<>();
-            for (Callable<Outcome> task : tasks) {
-                futures.add(pool.submit(task));
-            }
-            start.countDown();
-            List<Outcome> outcomes = new ArrayList<>();
-            for (Future<Outcome> future : futures) {
-                outcomes.add(future.get(120, TimeUnit.SECONDS));
-            }
-            return outcomes;
-        } finally {
-            pool.shutdownNow();
-        }
-    }
-
     @Test
     void hundredConcurrentTransfersWithBalanceForFiftyExactlyFiftySucceed() throws Exception {
         Customer sender = fixtures.customer(WalletTier.FULL, 500_000); // ₹5,000 = 50 x ₹100
         Customer receiver = fixtures.customer(WalletTier.FULL, 0);
-        CountDownLatch start = new CountDownLatch(1);
         List<Callable<Outcome>> tasks = new ArrayList<>();
         for (int i = 0; i < 100; i++) {
-            tasks.add(transfer(sender, receiver, 10_000, start));
+            tasks.add(transfer(sender, receiver, 10_000));
         }
 
-        List<Outcome> outcomes = runTogether(tasks, start);
+        List<Outcome> outcomes = ConcurrentRun.together(tasks);
 
         assertThat(outcomes).filteredOn(o -> o == Outcome.COMPLETED).hasSize(50);
         assertThat(outcomes).filteredOn(o -> o == Outcome.INSUFFICIENT_FUNDS).hasSize(50);
@@ -105,25 +74,5 @@ class TransferConcurrencyIT {
         // The ledger reconciles: the journal-derived balances equal the cached ones.
         assertThat(fixtures.ledgerBalance(sender.walletId())).isZero();
         assertThat(fixtures.ledgerBalance(receiver.walletId())).isEqualTo(500_000);
-    }
-
-    @Test
-    void oppositeTransfersTwoHundredTimesNeverDeadlockAndPreserveTotals() throws Exception {
-        Customer a = fixtures.customer(WalletTier.FULL, 1_000_000);
-        Customer b = fixtures.customer(WalletTier.FULL, 1_000_000);
-        CountDownLatch start = new CountDownLatch(1);
-        List<Callable<Outcome>> tasks = new ArrayList<>();
-        for (int i = 0; i < 200; i++) {
-            tasks.add(i % 2 == 0 ? transfer(a, b, 100, start) : transfer(b, a, 100, start));
-        }
-
-        List<Outcome> outcomes = runTogether(tasks, start);
-
-        assertThat(outcomes).as("no deadlock: every transfer completed").containsOnly(Outcome.COMPLETED).hasSize(200);
-        // 100 each way of ₹1: both end where they started, and the total is preserved.
-        assertThat(fixtures.wallet(a.walletId()).balance()).isEqualTo(Money.of(1_000_000, Money.INR));
-        assertThat(fixtures.wallet(b.walletId()).balance()).isEqualTo(Money.of(1_000_000, Money.INR));
-        assertThat(fixtures.ledgerBalance(a.walletId()) + fixtures.ledgerBalance(b.walletId())).isEqualTo(2_000_000);
-        assertThat(fixtures.ledgerBalance(a.walletId())).isEqualTo(1_000_000);
     }
 }

@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 /** Port for transfers; implemented by Spring Data in {@code payments.infrastructure}. */
 public interface TransferRepository {
@@ -13,6 +15,16 @@ public interface TransferRepository {
     Transfer saveAndFlush(Transfer transfer);
 
     Optional<Transfer> findById(UUID id);
+
+    /**
+     * The transfer with its row locked ({@code SELECT ... FOR UPDATE}) until the transaction ends. Used by the
+     * compliance review so two officers deciding the same held transfer are serialised. Lock order: the transfer
+     * row first, then the wallets (ADR 0004).
+     */
+    Optional<Transfer> findByIdForUpdate(UUID id);
+
+    /** Transfers in one status; the caller supplies the sort (the review queue is oldest first). */
+    Page<Transfer> findByStatus(TransferStatus status, Pageable pageable);
 
     /**
      * Sum in minor units of the sender's transfers created at or after {@code fromInclusive} with one of the
