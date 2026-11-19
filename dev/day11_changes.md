@@ -7,7 +7,7 @@
 - **`TransferConcurrencyIT` and `DeadlockFreedomIT`** (must-pass 4 and 5): ExecutorService + CountDownLatch, with a 60 s timeout.
 - **`docs/adr/0004-pessimistic-locking.md`**.
 
-Branch: `feature/m6-payments-part3` (created from `master`). **Not committed yet.**
+Branch: `feature/m6-payments-part3` (created from `master`), merged into `master`.
 
 Decisions approved in the plan:
 1. **The hold path is extracted from `transfer()`**. The extraction diff was shown and approved before any code was written. Step 5's body is now one call, `held.hold(transfer, now)`. Nothing else in `transfer()` changed. Creating a hold and releasing one now live in one class, `HeldTransferService`.
@@ -87,7 +87,7 @@ Plus the new constructor argument `HeldTransferService held`. Outside `transfer(
 
 ### 3. Machine setup done on Day 11 (not in Git)
 
-- Branch `feature/m6-payments-part3` created from `master`. **Nothing committed yet.**
+- Branch `feature/m6-payments-part3` created from `master`, committed and merged back into `master` (`--no-ff`). Not pushed.
 - No new dependencies, no `.env` changes, no new Docker images. One new migration (`V12`).
 
 ### 4. Deferred
