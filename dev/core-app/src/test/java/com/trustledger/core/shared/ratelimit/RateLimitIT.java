@@ -48,12 +48,12 @@ class RateLimitIT {
     void twentyFirstTransferInAMinuteIsRateLimited() throws Exception {
         String subject = ApiMockMvc.newSubject();
         for (int i = 1; i <= 20; i++) {
-            mvc.perform(post("/api/v1/transfers").with(customer(subject)))
+            mvc.perform(post("/api/v1/topups").with(customer(subject)))
                     .andExpect(status().isNotImplemented())
                     .andExpect(header().string(RateLimitFilter.REMAINING_HEADER, String.valueOf(20 - i)));
         }
 
-        mvc.perform(post("/api/v1/transfers").with(customer(subject)).header(CorrelationIdFilter.HEADER, "rl-429"))
+        mvc.perform(post("/api/v1/topups").with(customer(subject)).header(CorrelationIdFilter.HEADER, "rl-429"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(header().exists("Retry-After"))
@@ -61,7 +61,7 @@ class RateLimitIT {
                 .andExpect(jsonPath("$.type").value("https://trustledger.dev/errors/rate-limited"))
                 .andExpect(jsonPath("$.status").value(429))
                 .andExpect(jsonPath("$.errorCode").value("RATE_LIMITED"))
-                .andExpect(jsonPath("$.instance").value("/api/v1/transfers"))
+                .andExpect(jsonPath("$.instance").value("/api/v1/topups"))
                 .andExpect(jsonPath("$.correlationId").value("rl-429"));
     }
 
@@ -69,7 +69,7 @@ class RateLimitIT {
     void topupsShareTheMoneyBucketWithTransfers() throws Exception {
         String subject = ApiMockMvc.newSubject();
         for (int i = 0; i < 10; i++) {
-            mvc.perform(post("/api/v1/transfers").with(customer(subject))).andExpect(status().isNotImplemented());
+            mvc.perform(post("/api/v1/topups").with(customer(subject))).andExpect(status().isNotImplemented());
             mvc.perform(post("/api/v1/topups").with(customer(subject))).andExpect(status().isNotImplemented());
         }
 
@@ -80,11 +80,11 @@ class RateLimitIT {
     void limitIsPerUser() throws Exception {
         String busy = ApiMockMvc.newSubject();
         for (int i = 0; i < 20; i++) {
-            mvc.perform(post("/api/v1/transfers").with(customer(busy)));
+            mvc.perform(post("/api/v1/topups").with(customer(busy)));
         }
-        mvc.perform(post("/api/v1/transfers").with(customer(busy))).andExpect(status().isTooManyRequests());
+        mvc.perform(post("/api/v1/topups").with(customer(busy))).andExpect(status().isTooManyRequests());
 
-        mvc.perform(post("/api/v1/transfers").with(customer(ApiMockMvc.newSubject())))
+        mvc.perform(post("/api/v1/topups").with(customer(ApiMockMvc.newSubject())))
                 .andExpect(status().isNotImplemented());
     }
 
@@ -92,9 +92,9 @@ class RateLimitIT {
     void exhaustedMoneyBucketDoesNotBlockOtherEndpoints() throws Exception {
         String subject = ApiMockMvc.newSubject();
         for (int i = 0; i < 20; i++) {
-            mvc.perform(post("/api/v1/transfers").with(customer(subject)));
+            mvc.perform(post("/api/v1/topups").with(customer(subject)));
         }
-        mvc.perform(post("/api/v1/transfers").with(customer(subject))).andExpect(status().isTooManyRequests());
+        mvc.perform(post("/api/v1/topups").with(customer(subject))).andExpect(status().isTooManyRequests());
 
         mvc.perform(get("/api/v1/me").with(customer(subject)))
                 .andExpect(status().isOk())
@@ -115,14 +115,14 @@ class RateLimitIT {
 
     @Test
     void unauthenticatedRequestsDoNotSpendAnyBudget() throws Exception {
-        mvc.perform(post("/api/v1/transfers")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/topups")).andExpect(status().isUnauthorized());
         mvc.perform(get("/actuator/health")).andExpect(status().isOk());
     }
 
     @Test
     void bucketsLiveInRedisAndExpire() throws Exception {
         String subject = ApiMockMvc.newSubject();
-        mvc.perform(post("/api/v1/transfers").with(customer(subject))).andExpect(status().isNotImplemented());
+        mvc.perform(post("/api/v1/topups").with(customer(subject))).andExpect(status().isNotImplemented());
 
         String key = "rl:money:" + subject;
         assertThat(redis.hasKey(key)).isTrue();

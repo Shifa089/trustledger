@@ -1,0 +1,58 @@
+### P2P transfers (FR-P-1 to FR-P-3, M6). Fake test data only.
+# Prerequisites: tokens for customer1, customer2 and officer1 from auth.http; both customers at FULL KYC
+# (kyc.http), so both have FULL wallets. Run GET /wallets/me as customer2 first to capture its wallet ID.
+# Top-ups arrive in M7: until then, fund customer1 for a manual run with a TOPUP posting + credit, or expect
+# 422 INSUFFICIENT_FUNDS on the transfer below.
+
+### customer2: own wallet (captures the recipient wallet ID)
+GET {{api}}/api/v1/wallets/me
+Authorization: Bearer {{customer2_token}}
+
+> {% client.global.set("receiver_wallet_id", response.body.walletId); %}
+
+### customer1 -> customer2 by wallet ID -> 201 {status COMPLETED, amount "250.00"}
+# Change nothing and run again -> same 201 body with header Idempotent-Replayed: true, money moved once.
+# Change the amount and run again with the same key -> 422 IDEMPOTENCY_KEY_REUSED.
+POST {{api}}/api/v1/transfers
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: 6f1f8a52-2a8e-4b7e-9d43-3c0f6a1d2b01
+Content-Type: application/json
+
+{"recipientWalletId": "{{receiver_wallet_id}}", "amount": "250.00", "note": "Test dinner split"}
+
+> {% client.global.set("transfer_id", response.body.id); %}
+
+### Same transfer without Idempotency-Key -> 400 VALIDATION_FAILED
+POST {{api}}/api/v1/transfers
+Authorization: Bearer {{customer1_token}}
+Content-Type: application/json
+
+{"recipientWalletId": "{{receiver_wallet_id}}", "amount": "250.00"}
+
+### At or above ₹50,000 -> 201 {status HELD_FOR_REVIEW}; the amount moves to "held" on GET /wallets/me
+POST {{api}}/api/v1/transfers
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: 6f1f8a52-2a8e-4b7e-9d43-3c0f6a1d2b02
+Content-Type: application/json
+
+{"recipientWalletId": "{{receiver_wallet_id}}", "amount": "50000.00"}
+
+### Bad amount (3 decimals) -> 400
+POST {{api}}/api/v1/transfers
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: 6f1f8a52-2a8e-4b7e-9d43-3c0f6a1d2b03
+Content-Type: application/json
+
+{"recipientWalletId": "{{receiver_wallet_id}}", "amount": "10.001"}
+
+### Sender reads it -> 200
+GET {{api}}/api/v1/transfers/{{transfer_id}}
+Authorization: Bearer {{customer1_token}}
+
+### Receiver reads it -> 200
+GET {{api}}/api/v1/transfers/{{transfer_id}}
+Authorization: Bearer {{customer2_token}}
+
+### An officer on the customer endpoint -> 403
+GET {{api}}/api/v1/transfers/{{transfer_id}}
+Authorization: Bearer {{officer1_token}}

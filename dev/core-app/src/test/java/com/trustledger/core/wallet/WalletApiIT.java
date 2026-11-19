@@ -84,6 +84,30 @@ class WalletApiIT {
         assertThat(locked).extracting(WalletView::walletId).containsExactly(small, large);
     }
 
+    /**
+     * Regression (M6 part 2): a wallet read unlocked earlier in the transaction (as a transfer resolves its
+     * recipient), changed meanwhile by another transaction, must come back from the lock with the committed
+     * balance. Before the fix Hibernate refused the newer row version (ObjectOptimisticLockingFailureException).
+     */
+    @Test
+    void lockAfterAnUnlockedReadSeesTheLatestCommittedBalance() {
+        UUID wallet = fixtures.wallet(WalletTier.FULL);
+        fixtures.fund(wallet, 1_000);
+
+        WalletView afterDebit = tx.execute(status -> {
+            assertThat(api.findById(wallet).orElseThrow().balance()).isEqualTo(inr(1_000));
+            // Another thread, so another transaction, commits a credit while ours holds the stale snapshot.
+            java.util.concurrent.CompletableFuture.runAsync(() -> fixtures.fund(wallet, 500)).join();
+
+            WalletView locked = api.lockForUpdate(List.of(wallet)).getFirst();
+            assertThat(locked.balance()).isEqualTo(inr(1_500));
+            return api.debit(wallet, inr(1_200));
+        });
+
+        assertThat(afterDebit.balance()).isEqualTo(inr(300));
+        assertThat(balance(wallet)).isEqualTo(300);
+    }
+
     @Test
     void lockForUpdateNeedsATransaction() {
         UUID wallet = fixtures.wallet(WalletTier.FULL);

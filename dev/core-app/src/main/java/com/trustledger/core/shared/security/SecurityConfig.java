@@ -122,6 +122,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/*/kyc/**").hasRole(CUSTOMER)
                         .requestMatchers("/api/*/wallets/**").hasRole(CUSTOMER)
                         .requestMatchers(HttpMethod.POST, "/api/*/transfers", "/api/*/topups").hasRole(CUSTOMER)
+                        .requestMatchers(HttpMethod.GET, "/api/*/transfers/*", "/api/*/topups/*").hasRole(CUSTOMER)
                         .requestMatchers("/actuator/**").hasRole(ADMIN)
                         // Reached only when the local-only swagger chain does not exist.
                         .requestMatchers(SWAGGER_PATHS).authenticated()

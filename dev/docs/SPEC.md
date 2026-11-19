@@ -297,8 +297,8 @@ All endpoints sit under `/api/v1` (path versioning configured with Spring Framew
 | GET | `/wallets/me/transactions` | CUSTOMER | `from`, `to`, `type`, `page`, `size`, `sort` |
 | GET | `/wallets/me/statements/{yyyy-MM}` | CUSTOMER | PDF |
 | POST | `/compliance/wallets/{id}/freeze`, `/unfreeze` | COMPLIANCE\_OFFICER | Reason required |
-| POST | `/transfers` | CUSTOMER | `Idempotency-Key` required |
-| GET | `/transfers/{id}` | CUSTOMER (sender or receiver) | - |
+| POST | `/transfers` | CUSTOMER | `Idempotency-Key` required; 201 with `status` COMPLETED or HELD\_FOR\_REVIEW |
+| GET | `/transfers/{id}` | CUSTOMER (sender or receiver) | Anyone else gets the same 404 as an unknown ID |
 | GET | `/compliance/transfers?status=HELD_FOR_REVIEW` | COMPLIANCE\_OFFICER | Review queue |
 | POST | `/compliance/transfers/{id}/approve`, `/reject` | COMPLIANCE\_OFFICER | - |
 | POST | `/topups` | CUSTOMER | `Idempotency-Key` required; returns Razorpay order ID and key ID |
