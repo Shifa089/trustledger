@@ -1,5 +1,6 @@
 package com.trustledger.core.payments.application;
 
+import com.trustledger.core.shared.Money;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Objects;
@@ -8,18 +9,21 @@ import org.springframework.scheduling.support.CronExpression;
 import org.springframework.util.unit.DataSize;
 
 /**
- * {@code trustledger.payments.*}. Startup fails on a value that would break idempotency or the limit windows.
+ * {@code trustledger.payments.*}. Startup fails on a value that would break idempotency, the limit windows or
+ * top-ups.
  *
- * @param limitZone   where a "day" and a "month" start for the daily and monthly transfer limits
- *                    ({@code Asia/Kolkata}: an Indian customer's day, not UTC's)
+ * @param limitZone   where a "day" and a "month" start for the daily and monthly transfer limits and the monthly
+ *                    load limit ({@code Asia/Kolkata}: an Indian customer's day, not UTC's)
  * @param idempotency the {@code Idempotency-Key} settings
+ * @param topups      the top-up settings (M7)
  */
 @ConfigurationProperties("trustledger.payments")
-public record PaymentsProperties(ZoneId limitZone, Idempotency idempotency) {
+public record PaymentsProperties(ZoneId limitZone, Idempotency idempotency, Topups topups) {
 
     public PaymentsProperties {
         Objects.requireNonNull(limitZone, "trustledger.payments.limit-zone is required");
         Objects.requireNonNull(idempotency, "trustledger.payments.idempotency is required");
+        Objects.requireNonNull(topups, "trustledger.payments.topups is required");
     }
 
     /**
@@ -57,6 +61,21 @@ public record PaymentsProperties(ZoneId limitZone, Idempotency idempotency) {
             if (lockAtMostFor == null || lockAtMostFor.isNegative() || lockAtMostFor.isZero()) {
                 throw new IllegalArgumentException(
                         "trustledger.payments.idempotency.lock-at-most-for must be positive");
+            }
+        }
+    }
+
+    /**
+     * @param minAmount    smallest top-up accepted, a positive INR amount (Razorpay's own minimum is ₹1.00, so a
+     *                     smaller order would come back as a confusing 502 instead of a clear 400)
+     * @param checkoutPage serve the manual-test {@code /checkout.html} page; only the {@code local} profile turns it on
+     */
+    public record Topups(Money minAmount, boolean checkoutPage) {
+
+        public Topups {
+            if (minAmount == null || !Money.INR.equals(minAmount.currency()) || minAmount.isZero()) {
+                throw new IllegalArgumentException(
+                        "trustledger.payments.topups.min-amount must be a positive INR amount");
             }
         }
     }

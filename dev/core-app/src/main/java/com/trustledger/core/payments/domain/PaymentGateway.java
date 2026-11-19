@@ -37,6 +37,12 @@ public interface PaymentGateway {
     /** Reads all payment attempts for an order (FR-P-6 reconciliation); empty if none. Safe to retry. */
     List<GatewayPayment> fetchOrderPayments(String orderId);
 
+    /**
+     * The public API key ID the browser passes to the gateway's checkout ({@code rzp_test_...}). Not a secret: the
+     * customer's browser needs it. Exposed here so nothing outside infrastructure reads the gateway configuration.
+     */
+    String checkoutKeyId();
+
     static String requireOrderId(String orderId) {
         if (orderId == null || !ORDER_ID.matcher(orderId).matches()) {
             throw new IllegalArgumentException("Not a gateway order ID");

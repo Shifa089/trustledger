@@ -5,6 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import com.trustledger.core.payments.application.PaymentsProperties.Idempotency;
+import com.trustledger.core.payments.application.PaymentsProperties.Topups;
+import com.trustledger.core.shared.Money;
+import com.trustledger.core.shared.config.MoneyPropertyConverter;
+import java.util.Currency;
 import java.time.Duration;
 import java.time.ZoneId;
 import org.junit.jupiter.api.Test;
@@ -23,6 +27,7 @@ class PaymentsPropertiesTest {
     private static final DataSize KB16 = DataSize.ofKilobytes(16);
     private static final String CRON = "0 15 * * * *";
     private static final Duration TEN_MIN = Duration.ofMinutes(10);
+    private static final Topups TOPUPS = new Topups(Money.of(100, Money.INR), false);
 
     @Test
     void defaultsAreValid() {
@@ -59,10 +64,23 @@ class PaymentsPropertiesTest {
     }
 
     @Test
-    void zoneAndIdempotencyAreRequired() {
+    void zoneIdempotencyAndTopupsAreRequired() {
         Idempotency valid = idempotency(DAY, KB16, CRON, 1, TEN_MIN);
-        assertThatNullPointerException().isThrownBy(() -> new PaymentsProperties(null, valid));
-        assertThatNullPointerException().isThrownBy(() -> new PaymentsProperties(ZoneId.of("Asia/Kolkata"), null));
+        assertThatNullPointerException().isThrownBy(() -> new PaymentsProperties(null, valid, TOPUPS));
+        assertThatNullPointerException().isThrownBy(() -> new PaymentsProperties(ZoneId.of("Asia/Kolkata"), null, TOPUPS));
+        assertThatNullPointerException().isThrownBy(() -> new PaymentsProperties(ZoneId.of("Asia/Kolkata"), valid, null));
+    }
+
+    @Test
+    void topupMinimumMustBeAPositiveInrAmount() {
+        assertThat(TOPUPS.minAmount()).isEqualTo(Money.of(100, Money.INR));
+        assertThatIllegalArgumentException().isThrownBy(() -> new Topups(null, false))
+                .withMessageContaining("min-amount");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Topups(Money.zero(Money.INR), false))
+                .withMessageContaining("min-amount");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new Topups(Money.of(100, Currency.getInstance("USD")), false))
+                .withMessageContaining("min-amount");
     }
 
     // --- binding, as at startup ---
@@ -73,14 +91,15 @@ class PaymentsPropertiesTest {
     }
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withUserConfiguration(Binding.class)
+            .withUserConfiguration(Binding.class, MoneyPropertyConverter.class)
             .withPropertyValues(
                     "trustledger.payments.limit-zone=Asia/Kolkata",
                     "trustledger.payments.idempotency.ttl=24h",
                     "trustledger.payments.idempotency.max-body-size=16KB",
                     "trustledger.payments.idempotency.cleanup-cron=0 15 * * * *",
                     "trustledger.payments.idempotency.cleanup-batch-size=1000",
-                    "trustledger.payments.idempotency.lock-at-most-for=10m");
+                    "trustledger.payments.idempotency.lock-at-most-for=10m",
+                    "trustledger.payments.topups.min-amount=1.00");
 
     @Test
     void bindsFromConfiguration() {
@@ -90,7 +109,15 @@ class PaymentsPropertiesTest {
             assertThat(properties.limitZone()).isEqualTo(ZoneId.of("Asia/Kolkata"));
             assertThat(properties.idempotency().ttl()).isEqualTo(DAY);
             assertThat(properties.idempotency().maxBodySize()).isEqualTo(KB16);
+            assertThat(properties.topups().minAmount()).isEqualTo(Money.of(100, Money.INR));
+            assertThat(properties.topups().checkoutPage()).isFalse();
         });
+    }
+
+    @Test
+    void zeroTopupMinimumFailsStartup() {
+        runner.withPropertyValues("trustledger.payments.topups.min-amount=0.00")
+                .run(context -> assertThat(context).hasFailed());
     }
 
     @Test

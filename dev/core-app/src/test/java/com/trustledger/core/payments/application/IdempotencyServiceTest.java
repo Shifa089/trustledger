@@ -15,6 +15,7 @@ import com.trustledger.core.payments.domain.IdempotencyKeyRecord;
 import com.trustledger.core.payments.domain.IdempotencyKeyRepository;
 import com.trustledger.core.payments.domain.IdempotencyStatus;
 import com.trustledger.core.shared.ErrorCode;
+import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
 import java.time.Clock;
 import java.time.Duration;
@@ -36,7 +37,8 @@ class IdempotencyServiceTest {
 
     static PaymentsProperties properties() {
         return new PaymentsProperties(ZoneId.of("Asia/Kolkata"), new PaymentsProperties.Idempotency(
-                Duration.ofHours(24), DataSize.ofKilobytes(16), "0 15 * * * *", 1000, Duration.ofMinutes(10)));
+                Duration.ofHours(24), DataSize.ofKilobytes(16), "0 15 * * * *", 1000, Duration.ofMinutes(10)),
+                new PaymentsProperties.Topups(Money.of(100, Money.INR), false));
     }
 
     private final IdempotencyKeyRepository keys = mock(IdempotencyKeyRepository.class);

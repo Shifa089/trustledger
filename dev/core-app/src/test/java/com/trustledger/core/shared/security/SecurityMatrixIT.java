@@ -184,8 +184,17 @@ class SecurityMatrixIT {
             "POST, /api/v1/compliance/transfers/00000000-0000-7000-8000-000000000001/reject, COMPLIANCE_OFFICER, 404",
             "POST, /api/v1/compliance/transfers/00000000-0000-7000-8000-000000000001/reject, ADMIN,     403",
             "POST, /api/v1/topups,                        NONE,               401",
-            "POST, /api/v1/topups,                        CUSTOMER,           501",
+            // Top-ups (M7): no Idempotency-Key and no body gets a CUSTOMER past security to 400.
+            "POST, /api/v1/topups,                        CUSTOMER,           400",
             "POST, /api/v1/topups,                        COMPLIANCE_OFFICER, 403",
+            "POST, /api/v1/topups,                        ADMIN,              403",
+            "GET, /api/v1/topups/00000000-0000-7000-8000-000000000001, NONE,               401",
+            "GET, /api/v1/topups/00000000-0000-7000-8000-000000000001, CUSTOMER,           404",
+            "GET, /api/v1/topups/00000000-0000-7000-8000-000000000001, COMPLIANCE_OFFICER, 403",
+            "GET, /api/v1/topups/00000000-0000-7000-8000-000000000001, AUDITOR,            403",
+            // The manual checkout page exists only with the local profile flag; without it, it is denied.
+            "GET, /checkout.html,                         NONE,               401",
+            "GET, /checkout.js,                           CUSTOMER,           403",
             "GET, /api/v1/ping,                           NONE,               401",
             "GET, /api/v1/ping,                           AUDITOR,            200",
             "POST, /api/v1/webhooks/probe,                NONE,               200",

@@ -17,6 +17,8 @@ import com.trustledger.core.wallet.WalletView;
 import com.trustledger.core.wallet.application.WalletComplianceService;
 import com.trustledger.core.wallet.application.WalletLedgerLinkService;
 import com.trustledger.core.wallet.application.WalletProvisioningService;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -122,5 +124,41 @@ class PaymentsFixtures {
     long journalEntriesFor(UUID transferId) {
         return jdbc.queryForObject("select count(*) from ledger.journal_entries where reference_type = 'TRANSFER'"
                 + " and reference_id = ? and entry_type = 'P2P_TRANSFER'", Long.class, transferId);
+    }
+
+    // --- top-ups (M7) ---
+
+    /** Inserts a top-up row directly, e.g. to use up part of a monthly load. Gateway IDs follow the V13 rules. */
+    UUID insertTopup(UUID walletId, long minor, String status, Instant createdAt) {
+        UUID id = UUID.randomUUID();
+        String suffix = id.toString().replace("-", "").substring(0, 20);
+        String orderId = status.equals("CREATED") ? null : "order_" + suffix;
+        String paymentId = status.equals("CAPTURED") ? "pay_" + suffix : null;
+        UUID entryId = status.equals("CAPTURED") ? UUID.randomUUID() : null;
+        jdbc.update("""
+                insert into payments.topups (id, wallet_id, amount_minor, currency, gateway_order_id,
+                    gateway_payment_id, status, journal_entry_id, created_at, updated_at, version)
+                values (?, ?, ?, 'INR', ?, ?, ?, ?, ?, ?, 0)""",
+                id, walletId, minor, orderId, paymentId, status, entryId, Timestamp.from(createdAt),
+                Timestamp.from(createdAt));
+        return id;
+    }
+
+    long topupsOf(UUID walletId) {
+        return jdbc.queryForObject("select count(*) from payments.topups where wallet_id = ?", Long.class, walletId);
+    }
+
+    long topupsIn(UUID walletId, String status) {
+        return jdbc.queryForObject("select count(*) from payments.topups where wallet_id = ? and status = ?",
+                Long.class, walletId, status);
+    }
+
+    String topupStatus(UUID topupId) {
+        return jdbc.queryForObject("select status from payments.topups where id = ?", String.class, topupId);
+    }
+
+    String topupOrderId(UUID topupId) {
+        return jdbc.queryForObject("select gateway_order_id from payments.topups where id = ?", String.class,
+                topupId);
     }
 }

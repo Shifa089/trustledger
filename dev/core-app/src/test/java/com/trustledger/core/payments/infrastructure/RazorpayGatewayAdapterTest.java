@@ -106,6 +106,12 @@ class RazorpayGatewayAdapterTest {
     class WireFormat {
 
         @Test
+        void checkoutKeyIdIsTheConfiguredTestKeyAndSendsNoRequest() {
+            assertThat(adapter.checkoutKeyId()).isEqualTo(KEY_ID).startsWith("rzp_test_");
+            assertThat(requests()).isZero();
+        }
+
+        @Test
         void createOrderPostsPaiseWithBasicAuthAndMapsTheOrder() {
             razorpay.stubFor(post("/v1/orders").willReturn(okJson(ORDER_JSON)));
 

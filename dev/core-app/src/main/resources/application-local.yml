@@ -40,3 +40,7 @@ trustledger:
       access-key: test
       secret-key: test
       create-bucket: true
+  # Manual test page for Razorpay Checkout in test mode: http://localhost:8080/checkout.html
+  payments:
+    topups:
+      checkout-page: true
