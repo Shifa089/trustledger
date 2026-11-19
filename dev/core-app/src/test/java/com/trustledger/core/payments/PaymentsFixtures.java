@@ -115,6 +115,10 @@ class PaymentsFixtures {
                 Long.class, senderWalletId);
     }
 
+    String transferStatus(UUID transferId) {
+        return jdbc.queryForObject("select status from payments.transfers where id = ?", String.class, transferId);
+    }
+
     long journalEntriesFor(UUID transferId) {
         return jdbc.queryForObject("select count(*) from ledger.journal_entries where reference_type = 'TRANSFER'"
                 + " and reference_id = ? and entry_type = 'P2P_TRANSFER'", Long.class, transferId);

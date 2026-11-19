@@ -46,16 +46,18 @@ public class TransferService {
     private final LimitChecker limits;
     private final RecipientResolver recipients;
     private final TransferRepository transfers;
+    private final HeldTransferService held;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
     public TransferService(WalletApi wallets, LedgerApi ledger, LimitChecker limits, RecipientResolver recipients,
-            TransferRepository transfers, ApplicationEventPublisher events, Clock clock) {
+            TransferRepository transfers, HeldTransferService held, ApplicationEventPublisher events, Clock clock) {
         this.wallets = wallets;
         this.ledger = ledger;
         this.limits = limits;
         this.recipients = recipients;
         this.transfers = transfers;
+        this.held = held;
         this.events = events;
         this.clock = clock;
     }
@@ -108,11 +110,7 @@ public class TransferService {
 
         // Step 5: high value -> reserve the money and wait for a compliance officer. No posting, no event.
         if (amount.isGreaterThanOrEqualTo(senderLimits.highValueThreshold())) {
-            wallets.hold(senderId, amount);
-            transfer.holdForReview(now);
-            Transfer held = transfers.save(transfer);
-            log.info("Transfer {} held for review", held.getId());
-            return TransferResult.of(held);
+            return held.hold(transfer, now);
         }
 
         // Step 6: post. Saving first assigns the UUIDv7 ID, which the posting uses as its business reference.
@@ -142,8 +140,11 @@ public class TransferService {
                 PostingLine.credit(AccountCodes.wallet(transfer.getReceiverWalletId()), amount)));
     }
 
-    /** FROZEN -> WALLET_FROZEN; CLOSED -> INVALID_STATE_TRANSITION, the same codes WalletApi itself uses. */
-    private static void requireActive(WalletView wallet, String frozenMessage) {
+    /**
+     * FROZEN -> WALLET_FROZEN; CLOSED -> INVALID_STATE_TRANSITION, the same codes WalletApi itself uses. Also used
+     * by {@link HeldTransferService#approve}.
+     */
+    static void requireActive(WalletView wallet, String frozenMessage) {
         switch (wallet.status()) {
             case ACTIVE -> { }
             case FROZEN -> throw new TrustLedgerException(ErrorCode.WALLET_FROZEN, frozenMessage);

@@ -56,3 +56,38 @@ Authorization: Bearer {{customer2_token}}
 ### An officer on the customer endpoint -> 403
 GET {{api}}/api/v1/transfers/{{transfer_id}}
 Authorization: Bearer {{officer1_token}}
+
+### --- Compliance review of held transfers (FR-P-3, M6 part 3) ---
+
+### Second ₹50,000 transfer, to have one to approve and one to reject -> 201 HELD_FOR_REVIEW
+POST {{api}}/api/v1/transfers
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: 6f1f8a52-2a8e-4b7e-9d43-3c0f6a1d2b03
+Content-Type: application/json
+
+{"recipientWalletId": "{{receiver_wallet_id}}", "amount": "50000.00"}
+
+### Officer: review queue, oldest first (captures the two oldest held IDs) -> 200, no note in the items
+GET {{api}}/api/v1/compliance/transfers?status=HELD_FOR_REVIEW&page=0&size=20
+Authorization: Bearer {{officer1_token}}
+
+> {%
+    client.global.set("held_id_1", response.body.items[0].id);
+    client.global.set("held_id_2", response.body.items[1].id);
+%}
+
+### Officer approves the first -> 200 {status COMPLETED, reviewedBy = officer1}; customer2's balance goes up
+POST {{api}}/api/v1/compliance/transfers/{{held_id_1}}/approve
+Authorization: Bearer {{officer1_token}}
+
+### Approving it again -> 409 INVALID_STATE_TRANSITION
+POST {{api}}/api/v1/compliance/transfers/{{held_id_1}}/approve
+Authorization: Bearer {{officer1_token}}
+
+### Officer rejects the second -> 200 {status REJECTED}; customer1's "held" goes back down
+POST {{api}}/api/v1/compliance/transfers/{{held_id_2}}/reject
+Authorization: Bearer {{officer1_token}}
+
+### A customer can't decide, not even on their own transfer -> 403
+POST {{api}}/api/v1/compliance/transfers/{{held_id_2}}/approve
+Authorization: Bearer {{customer1_token}}

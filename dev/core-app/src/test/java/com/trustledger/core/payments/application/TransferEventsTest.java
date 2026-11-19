@@ -93,8 +93,10 @@ class TransferEventsTest {
 
     @BeforeEach
     void setUp() {
-        service = new TransferService(wallets, ledger, limits, recipients, transfers, events,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        // The real hold path on the same mocks, so the hold test still sees wallets.hold and no posting.
+        HeldTransferService held = new HeldTransferService(wallets, ledger, limits, transfers, events, clock);
+        service = new TransferService(wallets, ledger, limits, recipients, transfers, held, events, clock);
         when(wallets.findByUser(SENDER_USER)).thenReturn(Optional.of(view(SENDER, WalletStatus.ACTIVE, 0)));
         when(recipients.resolve(eq(SENDER), any())).thenReturn(view(RECEIVER, WalletStatus.ACTIVE, 0));
         lockedAs(WalletStatus.ACTIVE, WalletStatus.ACTIVE);
