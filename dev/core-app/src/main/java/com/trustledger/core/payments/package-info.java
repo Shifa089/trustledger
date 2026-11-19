@@ -9,7 +9,9 @@
  * <p>
  * Top-ups (M7) reach Razorpay (test mode) through the {@code PaymentGateway} port; {@code RazorpayGatewayAdapter}
  * implements it with {@code RestClient} behind a Resilience4j retry (GETs only), circuit breaker and time limiter
- * (ADR 0014).
+ * (ADR 0014). {@code TopupService} starts a top-up: the {@code Topup} aggregate is saved CREATED under the wallet
+ * lock (monthly load and balance cap, {@code TopupLimitChecker}), the order is created with no transaction open,
+ * then the top-up is PENDING (or FAILED if the gateway failed). The wallet is credited by the webhook (part 3).
  * <p>
  * Payments depends on identity, wallet and ledger through their public APIs only
  * ({@link com.trustledger.core.identity.IdentityApi}, {@link com.trustledger.core.wallet.WalletApi},

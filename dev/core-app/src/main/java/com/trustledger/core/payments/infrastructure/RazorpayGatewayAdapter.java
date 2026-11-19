@@ -64,10 +64,12 @@ class RazorpayGatewayAdapter implements PaymentGateway, AutoCloseable {
     private final TimeLimiter timeLimiter;
     private final Retry retry;
     private final ExecutorService executor;
+    private final String keyId;
 
     RazorpayGatewayAdapter(RestClient http, CircuitBreaker circuitBreaker, TimeLimiter timeLimiter, Retry retry,
-            ExecutorService executor) {
+            ExecutorService executor, String keyId) {
         this.http = http;
+        this.keyId = Objects.requireNonNull(keyId, "keyId");
         this.circuitBreaker = circuitBreaker;
         this.timeLimiter = timeLimiter;
         this.retry = retry;
@@ -120,7 +122,7 @@ class RazorpayGatewayAdapter implements PaymentGateway, AutoCloseable {
                 .build());
 
         return new RazorpayGatewayAdapter(http, circuitBreaker, timeLimiter, retry,
-                Executors.newVirtualThreadPerTaskExecutor());
+                Executors.newVirtualThreadPerTaskExecutor(), properties.keyId());
     }
 
     @Override
@@ -169,9 +171,22 @@ class RazorpayGatewayAdapter implements PaymentGateway, AutoCloseable {
         });
     }
 
+    @Override
+    public String checkoutKeyId() {
+        return keyId;
+    }
+
     /** For tests and, later, the health indicator and metrics (M12). */
     CircuitBreaker.State circuitState() {
         return circuitBreaker.getState();
+    }
+
+    /**
+     * Back to CLOSED with an empty window. Test support only: integration tests share one adapter, so a test that
+     * opens the circuit must close it again for the test classes that run after it.
+     */
+    void resetCircuit() {
+        circuitBreaker.reset();
     }
 
     @Override

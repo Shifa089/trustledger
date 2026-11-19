@@ -90,6 +90,11 @@ trustledger:
       cleanup-cron: "0 15 * * * *"
       cleanup-batch-size: 1000
       lock-at-most-for: 10m
+    # Top-ups (M7). min-amount: Razorpay refuses orders below ₹1.00. checkout-page: the manual-test
+    # /checkout.html page (Razorpay Checkout in test mode); only application-local.yml turns it on.
+    topups:
+      min-amount: "1.00"
+      checkout-page: false
   # Razorpay in TEST MODE ONLY (M7, ADR 0014). Keys come from the environment (.env locally, Secrets Manager on
   # AWS). Startup fails on a live key (anything not rzp_test_...), a blank secret, or plain http to a remote host.
   # timeout: per attempt (TimeLimiter + socket read). The circuit opens when 50% of the last 10 calls failed

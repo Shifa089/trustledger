@@ -1,0 +1,49 @@
+### Top-ups (FR-P-4, M7 part 2). Razorpay TEST MODE only, fake test data only.
+# Prerequisites: core-app running with the local profile and RAZORPAY_* test keys in .env; a token for customer1
+# from auth.http; customer1 has a wallet (kyc.http, minimum KYC is enough: MIN wallets may add up to ₹10,000).
+# To actually pay: open http://localhost:8080/checkout.html (local profile only), paste the token, pay with a
+# Razorpay test card or UPI success@razorpay. The wallet is credited by the webhook in M7 part 3; until then the
+# top-up stays PENDING.
+
+### customer1: create a ₹500 top-up -> 201 {status PENDING, gatewayOrderId "order_...", keyId "rzp_test_..."}
+# Run again unchanged -> the same 201 body with Idempotent-Replayed: true, and no second Razorpay order.
+# Change the amount and run again with the same key -> 422 IDEMPOTENCY_KEY_REUSED.
+POST {{api}}/api/v1/topups
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: 0b9a3c1e-7d2f-4e6a-8c5b-1f2e3d4c5b01
+Content-Type: application/json
+
+{"amount": "500.00"}
+
+> {% client.global.set("topup_id", response.body.id); %}
+
+### customer1: read it back -> 200
+GET {{api}}/api/v1/topups/{{topup_id}}
+Authorization: Bearer {{customer1_token}}
+
+### customer2: someone else's top-up -> 404 NOT_FOUND (same as an unknown ID)
+GET {{api}}/api/v1/topups/{{topup_id}}
+Authorization: Bearer {{customer2_token}}
+
+### Above the monthly load (MIN wallet: ₹10,000) -> 422 LIMIT_EXCEEDED, no Razorpay order
+POST {{api}}/api/v1/topups
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: 0b9a3c1e-7d2f-4e6a-8c5b-1f2e3d4c5b02
+Content-Type: application/json
+
+{"amount": "10000.01"}
+
+### Below the minimum -> 400 VALIDATION_FAILED
+POST {{api}}/api/v1/topups
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: 0b9a3c1e-7d2f-4e6a-8c5b-1f2e3d4c5b03
+Content-Type: application/json
+
+{"amount": "0.50"}
+
+### Without Idempotency-Key -> 400 VALIDATION_FAILED
+POST {{api}}/api/v1/topups
+Authorization: Bearer {{customer1_token}}
+Content-Type: application/json
+
+{"amount": "500.00"}

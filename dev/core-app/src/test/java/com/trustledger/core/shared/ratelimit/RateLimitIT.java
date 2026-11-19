@@ -49,7 +49,7 @@ class RateLimitIT {
         String subject = ApiMockMvc.newSubject();
         for (int i = 1; i <= 20; i++) {
             mvc.perform(post("/api/v1/topups").with(customer(subject)))
-                    .andExpect(status().isNotImplemented())
+                    .andExpect(status().isBadRequest())
                     .andExpect(header().string(RateLimitFilter.REMAINING_HEADER, String.valueOf(20 - i)));
         }
 
@@ -69,8 +69,8 @@ class RateLimitIT {
     void topupsShareTheMoneyBucketWithTransfers() throws Exception {
         String subject = ApiMockMvc.newSubject();
         for (int i = 0; i < 10; i++) {
-            mvc.perform(post("/api/v1/topups").with(customer(subject))).andExpect(status().isNotImplemented());
-            mvc.perform(post("/api/v1/topups").with(customer(subject))).andExpect(status().isNotImplemented());
+            mvc.perform(post("/api/v1/topups").with(customer(subject))).andExpect(status().isBadRequest());
+            mvc.perform(post("/api/v1/topups").with(customer(subject))).andExpect(status().isBadRequest());
         }
 
         mvc.perform(post("/api/v1/topups").with(customer(subject))).andExpect(status().isTooManyRequests());
@@ -85,7 +85,7 @@ class RateLimitIT {
         mvc.perform(post("/api/v1/topups").with(customer(busy))).andExpect(status().isTooManyRequests());
 
         mvc.perform(post("/api/v1/topups").with(customer(ApiMockMvc.newSubject())))
-                .andExpect(status().isNotImplemented());
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -122,7 +122,7 @@ class RateLimitIT {
     @Test
     void bucketsLiveInRedisAndExpire() throws Exception {
         String subject = ApiMockMvc.newSubject();
-        mvc.perform(post("/api/v1/topups").with(customer(subject))).andExpect(status().isNotImplemented());
+        mvc.perform(post("/api/v1/topups").with(customer(subject))).andExpect(status().isBadRequest());
 
         String key = "rl:money:" + subject;
         assertThat(redis.hasKey(key)).isTrue();
