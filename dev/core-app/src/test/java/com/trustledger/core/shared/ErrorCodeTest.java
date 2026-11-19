@@ -34,6 +34,7 @@ class ErrorCodeTest {
             "IDEMPOTENCY_KEY_REUSED, 422",
             "RATE_LIMITED, 429",
             "GATEWAY_UNAVAILABLE, 503",
+            "GATEWAY_REJECTED, 502",
             "STORAGE_UNAVAILABLE, 503",
             "NOT_IMPLEMENTED, 501",
             "UNSUPPORTED_REQUEST, 400",

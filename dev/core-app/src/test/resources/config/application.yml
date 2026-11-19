@@ -15,6 +15,17 @@ trustledger:
   # No cron triggers in tests: ITs run reconciliation themselves, so a timed run can't interfere.
   scheduling:
     enabled: false
+  # WireMock stands in for Razorpay (WireMockConfiguration sets base-url to its random port). Obviously fake
+  # test-format keys. Short backoff so retry tests stay fast; the rest keeps the production values.
+  razorpay:
+    base-url: http://localhost:1
+    key-id: rzp_test_FAKEKEY0000000
+    key-secret: fake-key-secret-for-tests
+    webhook-secret: fake-webhook-secret-for-tests
+    retry:
+      max-attempts: 3
+      initial-backoff: 10ms
+      multiplier: 2.0
   kyc:
     storage:
       bucket: trustledger-kyc-test

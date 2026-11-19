@@ -38,6 +38,8 @@ public enum ErrorCode {
     AGE_REQUIREMENT_NOT_MET(HttpStatus.UNPROCESSABLE_CONTENT, "Age requirement not met"),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Too many requests"),
     GATEWAY_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Payment gateway unavailable"),
+    /** The gateway refused our request (4xx: bad keys, unknown ID, invalid field). Retrying will not help. */
+    GATEWAY_REJECTED(HttpStatus.BAD_GATEWAY, "Payment gateway rejected the request"),
     /** Document storage (S3) could not be reached or refused the request. */
     STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Document storage unavailable"),
     /** Endpoint declared but not built yet (stubs such as POST /transfers until M6). */
