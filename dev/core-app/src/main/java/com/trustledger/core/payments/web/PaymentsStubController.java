@@ -10,18 +10,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Placeholders so the money endpoints exist for security and rate-limit rules (M2) before payments is
- * built. Both return 501 {@code NOT_IMPLEMENTED}. Replaced by the real controllers in M6 (transfers) and
- * M7 (top-ups), which add the required {@code Idempotency-Key} header.
+ * Placeholder so the top-up endpoint exists for security and rate-limit rules (M2) before M7 builds it. Returns
+ * 501 {@code NOT_IMPLEMENTED}. Transfers have their real controller since M6 ({@link TransferController}).
  */
 @RestController
 class PaymentsStubController {
-
-    @PreAuthorize("hasRole('CUSTOMER')")
-    @PostMapping(path = "/transfers", version = "1")
-    ResponseEntity<ProblemDetail> transfer(HttpServletRequest request) {
-        return notImplemented("P2P transfers arrive in milestone M6.", request);
-    }
 
     @PreAuthorize("hasRole('CUSTOMER')")
     @PostMapping(path = "/topups", version = "1")

@@ -63,6 +63,8 @@ class WalletApiImpl implements WalletApi {
             throw new IllegalArgumentException("walletIds must be non-empty and contain no null");
         }
         Set<UUID> distinct = new LinkedHashSet<>(walletIds);
+        // A caller may have read these wallets unlocked earlier in this transaction (findById, findByUser).
+        locks.evictUnlocked(distinct);
         List<Wallet> locked = wallets.lockAllOrderedById(distinct);
         if (locked.size() != distinct.size()) {
             throw notFound();
