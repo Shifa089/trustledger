@@ -14,13 +14,17 @@ import java.util.UUID;
 public record MyWalletView(UUID walletId, WalletTier tier, WalletStatus status, String currency, String balance,
         String held, String available, Limits limits) {
 
-    /** {@code dailyTransfer} and {@code highValueThreshold} are {@code null} when the tier can't send P2P. */
+    /**
+     * {@code dailyTransfer} and {@code highValueThreshold} are {@code null} when the tier can't send P2P;
+     * {@code monthlyTransfer} also when no monthly limit is configured.
+     */
     public record Limits(String maxBalance, String monthlyLoad, boolean p2pAllowed, String dailyTransfer,
-            String highValueThreshold) {
+            String highValueThreshold, String monthlyTransfer) {
 
         static Limits of(WalletLimits limits) {
             return new Limits(limits.maxBalance().toDecimalString(), limits.monthlyLoad().toDecimalString(),
-                    limits.p2pAllowed(), decimal(limits.dailyTransfer()), decimal(limits.highValueThreshold()));
+                    limits.p2pAllowed(), decimal(limits.dailyTransfer()), decimal(limits.highValueThreshold()),
+                    decimal(limits.monthlyTransfer()));
         }
     }
 

@@ -48,6 +48,13 @@ class WalletApiImpl implements WalletApi {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<WalletView> findById(UUID walletId) {
+        Objects.requireNonNull(walletId, "walletId");
+        return wallets.findById(walletId).map(WalletViews::of);
+    }
+
+    @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public List<WalletView> lockForUpdate(List<UUID> walletIds) {
         Objects.requireNonNull(walletIds, "walletIds");

@@ -26,6 +26,9 @@ public interface WalletApi {
     /** The user's wallet, if they have reached minimum KYC. */
     Optional<WalletView> findByUser(UUID userId);
 
+    /** A wallet by ID, without locking it (e.g. resolving a transfer recipient before the locks are taken). */
+    Optional<WalletView> findById(UUID walletId);
+
     /**
      * Locks the wallets with {@code SELECT ... FOR UPDATE} (PESSIMISTIC_WRITE) in ascending ID order, so two
      * transfers in opposite directions can't deadlock. The order is PostgreSQL's {@code ORDER BY id}, which

@@ -114,6 +114,64 @@ class LimitsPropertiesTest {
         assertThat(full.highValueThreshold()).isNull();
     }
 
+    // --- monthly transfer limit (own policy, FR-P-2) ---
+
+    @Test
+    void monthlyTransferLimitIsOptional() {
+        assertThat(new LimitsProperties(rupees("50000.00"), MIN, FULL).forTier(WalletTier.FULL).monthlyTransfer())
+                .isNull();
+    }
+
+    @Test
+    void monthlyTransferLimitReachesTheWalletLimits() {
+        TierLimits monthly = new TierLimits(rupees("200000.00"), rupees("200000.00"), true, rupees("100000.00"),
+                rupees("500000.00"));
+
+        WalletLimits full = new LimitsProperties(rupees("50000.00"), MIN, monthly).forTier(WalletTier.FULL);
+
+        assertThat(full.monthlyTransfer()).isEqualTo(Money.of(50_000_000, Money.INR));
+        assertThat(new LimitsProperties(rupees("50000.00"), MIN, monthly).forTier(WalletTier.MIN).monthlyTransfer())
+                .isNull();
+    }
+
+    @Test
+    void monthlyTransferBelowDailyFails() {
+        TierLimits tooSmall = new TierLimits(rupees("200000.00"), rupees("200000.00"), true, rupees("100000.00"),
+                rupees("99999.99"));
+
+        assertThatIllegalArgumentException().isThrownBy(() -> new LimitsProperties(rupees("50000.00"), MIN, tooSmall))
+                .withMessageContaining("full.monthly-transfer");
+    }
+
+    @Test
+    void monthlyTransferEqualToDailyIsAllowed() {
+        TierLimits equal = new TierLimits(rupees("200000.00"), rupees("200000.00"), true, rupees("100000.00"),
+                rupees("100000.00"));
+
+        assertThat(new LimitsProperties(rupees("50000.00"), MIN, equal).forTier(WalletTier.FULL).monthlyTransfer())
+                .isEqualTo(rupees("100000.00"));
+    }
+
+    @Test
+    void monthlyTransferWithoutP2pOrZeroFails() {
+        TierLimits minWithMonthly = new TierLimits(rupees("10000.00"), rupees("10000.00"), false, null,
+                rupees("1.00"));
+        TierLimits zero = new TierLimits(rupees("200000.00"), rupees("200000.00"), true, rupees("100000.00"),
+                rupees("0"));
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new LimitsProperties(rupees("50000.00"), minWithMonthly, FULL))
+                .withMessageContaining("min.monthly-transfer");
+        assertThatIllegalArgumentException().isThrownBy(() -> new LimitsProperties(rupees("50000.00"), MIN, zero))
+                .withMessageContaining("full.monthly-transfer");
+    }
+
+    @Test
+    void walletLimitsRefuseAMonthlyLimitWithoutP2p() {
+        assertThatIllegalArgumentException().isThrownBy(() -> new WalletLimits(WalletTier.MIN, rupees("1.00"),
+                rupees("1.00"), false, null, null, rupees("1.00")));
+    }
+
     // --- binding from configuration, as at startup ---
 
     @Configuration(proxyBeanMethods = false)
@@ -141,6 +199,15 @@ class LimitsPropertiesTest {
             LimitsProperties limits = context.getBean(LimitsProperties.class);
             assertThat(limits.highValueThreshold().amountMinor()).isEqualTo(5_000_000);
             assertThat(limits.full().dailyTransfer().amountMinor()).isEqualTo(10_000_000);
+        });
+    }
+
+    @Test
+    void bindsTheOptionalMonthlyTransferLimit() {
+        runner.withPropertyValues("trustledger.limits.full.monthly-transfer=500000.00").run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(LimitsProperties.class).full().monthlyTransfer().amountMinor())
+                    .isEqualTo(50_000_000);
         });
     }
 

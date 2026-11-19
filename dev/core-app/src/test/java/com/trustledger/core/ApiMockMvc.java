@@ -4,6 +4,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
 import com.trustledger.core.identity.web.JitProvisioningFilter;
+import com.trustledger.core.payments.web.IdempotencyBodyFilter;
 import com.trustledger.core.shared.ratelimit.RateLimitFilter;
 import com.trustledger.core.shared.security.JwtRoleConverter;
 import com.trustledger.core.shared.web.CorrelationIdFilter;
@@ -18,7 +19,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Test support: MockMvc with the production filter order (correlation ID, Spring Security, rate limit,
- * JIT provisioning). Built by hand instead of {@code @AutoConfigureMockMvc} so every IT shares one
+ * JIT provisioning, idempotency body caching). Built by hand instead of {@code @AutoConfigureMockMvc} so every IT shares one
  * cached application context, and therefore one set of containers.
  */
 public final class ApiMockMvc {
@@ -30,7 +31,8 @@ public final class ApiMockMvc {
         return MockMvcBuilders.webAppContextSetup(context)
                 .addFilters(new CorrelationIdFilter())
                 .apply(springSecurity())
-                .addFilters(context.getBean(RateLimitFilter.class), context.getBean(JitProvisioningFilter.class))
+                .addFilters(context.getBean(RateLimitFilter.class), context.getBean(JitProvisioningFilter.class),
+                        context.getBean(IdempotencyBodyFilter.class))
                 .build();
     }
 

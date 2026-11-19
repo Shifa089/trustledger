@@ -132,6 +132,7 @@ TrustLedger is a prepaid digital wallet: customers complete KYC, add money throu
 | Money added per month | ₹10,000 | ₹2,00,000 | RBI PPI directions (verify) |
 | P2P transfers | Not allowed | Allowed | RBI: small PPIs can't transfer funds (verify) |
 | Transfers per day | - | ₹1,00,000 | Own policy |
+| Transfers per month (optional) | - | ₹5,00,000 | Own policy (FR-P-2 "monthly limits"); day and month start in Asia/Kolkata |
 | High-value hold threshold | - | ₹50,000 or more | Own policy |
 
 **AML rules (configurable)**
@@ -234,10 +235,10 @@ One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`,
 | `ledger.journal_entries` | `id`, `entry_type` (TOPUP, P2P\_TRANSFER, REVERSAL), `reference_type`, `reference_id`, `reverses_entry_id`, `reason`, `posted_at` | Unique (`reference_type`, `reference_id`, `entry_type`) so the same business event can't be posted twice; `reverses_entry_id` unique (reversed at most once); `reverses_entry_id` and `reason` set iff REVERSAL. A reversal's reference is (`JOURNAL_ENTRY`, original ID) |
 | `ledger.journal_lines` | `id`, `entry_id`, `account_id`, `direction` (DEBIT, CREDIT), `amount_minor`, `line_no` | Check `amount_minor > 0`; index on (`account_id`, `entry_id`) |
 | `shared.shedlock` | `name`, `lock_until`, `locked_at`, `locked_by` | ShedLock's lock table (ADR 0013): one row per scheduled job, e.g. `wallet-reconciliation`. Times come from the database clock |
-| `payments.transfers` | `id`, `sender_wallet_id`, `receiver_wallet_id`, `amount_minor`, `note`, `status` (INITIATED, HELD\_FOR\_REVIEW, COMPLETED, REJECTED, FAILED, REVERSED), `journal_entry_id`, `reviewed_by`, `version` | Index on (`sender_wallet_id`, `created_at`) for limit checks and history |
+| `payments.transfers` | `id`, `sender_wallet_id`, `receiver_wallet_id`, `amount_minor`, `note`, `status` (INITIATED, HELD\_FOR\_REVIEW, COMPLETED, REJECTED, FAILED, REVERSED), `journal_entry_id`, `reviewed_by`, `reviewed_at`, `currency`, `version` | Index on (`sender_wallet_id`, `created_at`) for limit checks and history; `amount_minor > 0`; sender ≠ receiver; `journal_entry_id` set iff COMPLETED/REVERSED (and unique); `reviewed_by`/`reviewed_at` together, required for REJECTED |
 | `payments.topups` | `id`, `wallet_id`, `amount_minor`, `gateway_order_id`, `gateway_payment_id`, `status` (CREATED, PENDING, CAPTURED, FAILED, EXPIRED), `journal_entry_id`, `version` | `gateway_order_id` unique |
 | `payments.webhook_events` | `id`, `gateway_event_id`, `event_type`, `payload` (jsonb), `signature_valid`, `processed_at` | `gateway_event_id` unique (de-duplication) |
-| `payments.idempotency_keys` | `user_id`, `idem_key`, `request_hash`, `status` (IN\_PROGRESS, COMPLETED), `response_status`, `response_body` (jsonb), `expires_at` | Primary key (`user_id`, `idem_key`); kept 24 hours |
+| `payments.idempotency_keys` | `user_id`, `idem_key`, `request_hash`, `status` (IN\_PROGRESS, COMPLETED), `response_status`, `response_body` (jsonb), `expires_at` | Primary key (`user_id`, `idem_key`); kept 24 hours; index on `expires_at` for the hourly cleanup job; a response is stored only for 2xx, any other outcome deletes the key |
 | `audit.audit_events` | `seq` (bigserial), `occurred_at`, `actor_id`, `actor_role`, `action`, `entity_type`, `entity_id`, `before`/`after` (jsonb, masked), `ip`, `correlation_id`, `prev_hash`, `hash` | Append-only; `hash` = SHA-256 of `prev_hash` + the event's canonical JSON |
 | `privacy.data_requests` | `id`, `user_id`, `type` (EXPORT, ERASURE), `status`, `result_s3_key` | - |
 | `event_publication` | Created by Spring Modulith | The outbox: events stored in the same transaction, then sent to Kafka |
