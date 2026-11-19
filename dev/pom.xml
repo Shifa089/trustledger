@@ -48,6 +48,11 @@
         <!-- Scheduled-job lock (ADR 0013). 7.10.1: released 2026-09-08, built against Spring 7.0 / Boot 4.1;
              7.11.0 was under two weeks old on Day 8. -->
         <shedlock.version>7.10.1</shedlock.version>
+        <!-- Payment-gateway resilience (ADR 0014): core modules only, configured in code from trustledger.razorpay.*.
+             2.4.0: released 2026-03-14. -->
+        <resilience4j.version>2.4.0</resilience4j.version>
+        <!-- Razorpay stubs in tests (ADR 0014). 3.13.2: newest stable (4.x is still beta), released 2025-11-14. -->
+        <wiremock.version>3.13.2</wiremock.version>
     </properties>
 
     <dependencyManagement>
@@ -92,6 +97,18 @@
                 <version>${shedlock.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-bom</artifactId>
+                <version>${resilience4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.wiremock</groupId>
+                <artifactId>wiremock-standalone</artifactId>
+                <version>${wiremock.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.testcontainers</groupId>

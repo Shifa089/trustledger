@@ -90,6 +90,28 @@ trustledger:
       cleanup-cron: "0 15 * * * *"
       cleanup-batch-size: 1000
       lock-at-most-for: 10m
+  # Razorpay in TEST MODE ONLY (M7, ADR 0014). Keys come from the environment (.env locally, Secrets Manager on
+  # AWS). Startup fails on a live key (anything not rzp_test_...), a blank secret, or plain http to a remote host.
+  # timeout: per attempt (TimeLimiter + socket read). The circuit opens when 50% of the last 10 calls failed
+  # (timeouts, 5xx, network errors; 4xx rejections don't count) and stays open 30 s. Only GETs are retried:
+  # creating an order is not idempotent at Razorpay.
+  razorpay:
+    base-url: ${RAZORPAY_BASE_URL:https://api.razorpay.com}
+    key-id: ${RAZORPAY_KEY_ID:}
+    key-secret: ${RAZORPAY_KEY_SECRET:}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
+    connect-timeout: 1s
+    timeout: 3s
+    circuit-breaker:
+      sliding-window-size: 10
+      failure-rate-threshold: 50
+      minimum-number-of-calls: 10
+      wait-duration-in-open-state: 30s
+      permitted-calls-in-half-open: 3
+    retry:
+      max-attempts: 3
+      initial-backoff: 200ms
+      multiplier: 2.0
   # Per-user budgets in Redis (Bucket4j), keyed by the token subject. 429 RATE_LIMITED when exceeded.
   # Money endpoints use their own, smaller bucket. If Redis is unreachable requests are allowed (fail open).
   rate-limit:

@@ -353,6 +353,7 @@ All endpoints sit under `/api/v1` (path versioning configured with Spring Framew
 | DOCUMENT\_TOO\_LARGE / UNSUPPORTED\_DOCUMENT\_TYPE | 413 / 415 |
 | INSUFFICIENT\_FUNDS / LIMIT\_EXCEEDED / IDEMPOTENCY\_KEY\_REUSED | 422 |
 | RATE\_LIMITED | 429 |
+| GATEWAY\_REJECTED (the gateway refused our request; retrying will not help) | 502 |
 | GATEWAY\_UNAVAILABLE / STORAGE\_UNAVAILABLE | 503 |
 
 ## 6. Cross-cutting conventions

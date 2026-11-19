@@ -7,6 +7,10 @@
  * {@link com.trustledger.core.payments.TransferCompleted}. High-value transfers are held and decided by a compliance
  * officer through {@code HeldTransferService} (approve posts and publishes; reject releases the hold).
  * <p>
+ * Top-ups (M7) reach Razorpay (test mode) through the {@code PaymentGateway} port; {@code RazorpayGatewayAdapter}
+ * implements it with {@code RestClient} behind a Resilience4j retry (GETs only), circuit breaker and time limiter
+ * (ADR 0014).
+ * <p>
  * Payments depends on identity, wallet and ledger through their public APIs only
  * ({@link com.trustledger.core.identity.IdentityApi}, {@link com.trustledger.core.wallet.WalletApi},
  * {@link com.trustledger.core.ledger.LedgerApi}). Its public API is the {@code TransferCompleted} event;

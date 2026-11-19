@@ -1,5 +1,8 @@
 package com.trustledger.core;
 
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
@@ -52,6 +55,22 @@ public class TestcontainersConfiguration {
     LocalStackContainer localStackContainer() {
         return new LocalStackContainer(DockerImageName.parse("localstack/localstack:4.14")).withServices("s3")
                 .withEnv("S3_SKIP_SIGNATURE_VALIDATION", "0");
+    }
+
+    /**
+     * Stands in for the Razorpay API (ADR 0014). In-process, not a container: it starts in milliseconds.
+     * Tests stub it per case and call {@code resetAll()} afterwards, since every IT shares this one server.
+     */
+    @Bean(destroyMethod = "stop")
+    WireMockServer razorpayWireMock() {
+        WireMockServer server = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        server.start();
+        return server;
+    }
+
+    @Bean
+    DynamicPropertyRegistrar razorpayProperties(WireMockServer razorpayWireMock) {
+        return registry -> registry.add("trustledger.razorpay.base-url", razorpayWireMock::baseUrl);
     }
 
     @Bean
