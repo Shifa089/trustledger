@@ -4,6 +4,7 @@ import com.trustledger.core.shared.Money;
 import com.trustledger.core.wallet.WalletLimits;
 import com.trustledger.core.wallet.WalletTier;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 /**
  * {@code trustledger.limits.*}: the wallet limits table (SPEC §2, FR-W-2). Amounts are decimal strings bound
@@ -21,9 +22,22 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record LimitsProperties(Money highValueThreshold, TierLimits min, TierLimits full) {
 
     /**
-     * @param dailyTransfer required when {@code p2pAllowed}, must be absent otherwise
+     * @param dailyTransfer   required when {@code p2pAllowed}, must be absent otherwise
+     * @param monthlyTransfer optional (own policy for FR-P-2's monthly limit); only with {@code p2pAllowed}, and
+     *                        never below {@code dailyTransfer}
      */
-    public record TierLimits(Money maxBalance, Money monthlyLoad, boolean p2pAllowed, Money dailyTransfer) {
+    public record TierLimits(Money maxBalance, Money monthlyLoad, boolean p2pAllowed, Money dailyTransfer,
+            Money monthlyTransfer) {
+
+        /** Configuration binding uses this canonical constructor. */
+        @ConstructorBinding
+        public TierLimits {
+        }
+
+        /** A tier without a monthly transfer limit. */
+        public TierLimits(Money maxBalance, Money monthlyLoad, boolean p2pAllowed, Money dailyTransfer) {
+            this(maxBalance, monthlyLoad, p2pAllowed, dailyTransfer, null);
+        }
 
         void validate(String tier) {
             requirePositive("trustledger.limits." + tier + ".max-balance", maxBalance);
@@ -33,6 +47,17 @@ public record LimitsProperties(Money highValueThreshold, TierLimits min, TierLim
             } else if (dailyTransfer != null) {
                 throw new IllegalArgumentException("trustledger.limits." + tier
                         + ".daily-transfer must not be set when p2p-allowed is false");
+            }
+            if (monthlyTransfer != null) {
+                if (!p2pAllowed) {
+                    throw new IllegalArgumentException("trustledger.limits." + tier
+                            + ".monthly-transfer must not be set when p2p-allowed is false");
+                }
+                requirePositive("trustledger.limits." + tier + ".monthly-transfer", monthlyTransfer);
+                if (dailyTransfer.isGreaterThan(monthlyTransfer)) {
+                    throw new IllegalArgumentException("trustledger.limits." + tier
+                            + ".monthly-transfer must not be below daily-transfer");
+                }
             }
         }
     }
@@ -70,7 +95,7 @@ public record LimitsProperties(Money highValueThreshold, TierLimits min, TierLim
         };
         return new WalletLimits(tier, limits.maxBalance(), limits.monthlyLoad(), limits.p2pAllowed(),
                 limits.p2pAllowed() ? limits.dailyTransfer() : null,
-                limits.p2pAllowed() ? highValueThreshold : null);
+                limits.p2pAllowed() ? highValueThreshold : null, limits.monthlyTransfer());
     }
 
     private static void requirePositive(String property, Money value) {

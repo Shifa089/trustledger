@@ -77,6 +77,19 @@ trustledger:
       monthly-load: "200000.00"
       p2p-allowed: true
       daily-transfer: "100000.00"
+      # Own policy (FR-P-2 "monthly limits"): outgoing P2P per calendar month in Asia/Kolkata. Optional.
+      monthly-transfer: "500000.00"
+  # Payments (M6). limit-zone: where a "day" and a "month" start for the daily and monthly transfer limits.
+  # idempotency: Idempotency-Key rows live for ttl (SPEC: 24 hours); max-body-size bounds the cached request
+  # body; the cleanup job deletes expired keys hourly (ShedLock "payments-idempotency-cleanup").
+  payments:
+    limit-zone: Asia/Kolkata
+    idempotency:
+      ttl: 24h
+      max-body-size: 16KB
+      cleanup-cron: "0 15 * * * *"
+      cleanup-batch-size: 1000
+      lock-at-most-for: 10m
   # Per-user budgets in Redis (Bucket4j), keyed by the token subject. 429 RATE_LIMITED when exceeded.
   # Money endpoints use their own, smaller bucket. If Redis is unreachable requests are allowed (fail open).
   rate-limit:

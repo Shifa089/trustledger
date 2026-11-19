@@ -10,6 +10,8 @@ import org.springframework.core.Ordered;
  * <li>Spring Security ({@link #SECURITY}): authenticates the bearer token, enforces URL rules.</li>
  * <li>{@link #RATE_LIMIT}: needs the authenticated user; runs before anything touches the database.</li>
  * <li>{@link #USER_PROVISIONING}: just-in-time creation of the user row (identity module).</li>
+ * <li>{@link #IDEMPOTENCY_BODY}: caches the request and response bodies of requests that carry an
+ * {@code Idempotency-Key} (payments module), so the interceptor can hash and replay them.</li>
  * </ol>
  * Filters after Spring Security still run inside its chain, so the security context is available.
  */
@@ -19,6 +21,7 @@ public final class FilterOrder {
     public static final int SECURITY = SecurityFilterProperties.DEFAULT_FILTER_ORDER;
     public static final int RATE_LIMIT = SECURITY + 10;
     public static final int USER_PROVISIONING = SECURITY + 20;
+    public static final int IDEMPOTENCY_BODY = SECURITY + 30;
 
     private FilterOrder() {
     }
