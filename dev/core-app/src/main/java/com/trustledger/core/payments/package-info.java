@@ -11,7 +11,14 @@
  * implements it with {@code RestClient} behind a Resilience4j retry (GETs only), circuit breaker and time limiter
  * (ADR 0014). {@code TopupService} starts a top-up: the {@code Topup} aggregate is saved CREATED under the wallet
  * lock (monthly load and balance cap, {@code TopupLimitChecker}), the order is created with no transaction open,
- * then the top-up is PENDING (or FAILED if the gateway failed). The wallet is credited by the webhook (part 3).
+ * then the top-up is PENDING (or FAILED if the gateway failed).
+ * <p>
+ * Settling (FR-P-4, FR-P-6): {@code TopupSettlementService} is the only place a top-up's money is booked. It locks
+ * the top-up, then the wallet, re-checks the limits ({@code TopupLimitChecker.checkCapture}) and either credits the
+ * wallet (GATEWAY_CLEARING -> WALLET, CAPTURED, {@link com.trustledger.core.payments.TopupCaptured} published) or,
+ * if the wallet can't take the money, parks it (GATEWAY_CLEARING -> SUSPENSE, PARKED, ADR 0006). It is called by the
+ * {@code payment.captured} / {@code payment.failed} webhook handlers and by {@code PendingTopupReconciler}, which
+ * every 5 minutes asks the gateway about PENDING top-ups older than 15 minutes and expires them after 24 hours.
  * <p>
  * Webhooks (FR-P-5): {@code POST /webhooks/razorpay} is public; {@code WebhookService} verifies the HMAC over the raw
  * body, stores every delivery in {@code payments.webhook_events} (accepted or rejected, personal fields removed),
@@ -20,7 +27,8 @@
  * <p>
  * Payments depends on identity, wallet and ledger through their public APIs only
  * ({@link com.trustledger.core.identity.IdentityApi}, {@link com.trustledger.core.wallet.WalletApi},
- * {@link com.trustledger.core.ledger.LedgerApi}). Its public API is the {@code TransferCompleted} event;
+ * {@link com.trustledger.core.ledger.LedgerApi}). Its public API is the {@code TransferCompleted} and
+ * {@code TopupCaptured} events;
  * everything in sub-packages is internal.
  */
 package com.trustledger.core.payments;

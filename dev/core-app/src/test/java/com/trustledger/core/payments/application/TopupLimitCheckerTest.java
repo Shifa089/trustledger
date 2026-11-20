@@ -21,6 +21,7 @@ import com.trustledger.core.wallet.WalletView;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.EnumSet;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -127,6 +128,61 @@ class TopupLimitCheckerTest {
         loaded(0);
         open(0);
         limitExceeded(() -> at(NOW).check(wallet("9999.99"), MIN, Money.parse("0.02")), "maximum");
+    }
+
+    // --- re-check on capture (M7 part 3b) ---
+
+    private void capturedThisMonth(long minor) {
+        when(topups.sumCreatedSince(eq(WALLET), eq(MONTH_START), eq(EnumSet.of(TopupStatus.CAPTURED))))
+                .thenReturn(minor);
+    }
+
+    private static WalletView wallet(String balance, WalletStatus status) {
+        Money money = Money.parse(balance);
+        return new WalletView(WALLET, UUID.randomUUID(), WalletTier.MIN, status, money, Money.zero(Money.INR), money);
+    }
+
+    @Test
+    void captureFitsWhenBalanceAndCapturedLoadLandExactlyOnTheLimits() {
+        capturedThisMonth(500_000);
+        assertThat(at(NOW).checkCapture(wallet("5000.00"), MIN, Money.parse("5000.00"))).isEmpty();
+    }
+
+    @Test
+    void captureOverTheBalanceCapIsParked() {
+        capturedThisMonth(0);
+        assertThat(at(NOW).checkCapture(wallet("9000.00"), MIN, Money.parse("1000.01")))
+                .contains(ParkReason.MAX_BALANCE);
+    }
+
+    @Test
+    void captureOverTheMonthlyLoadIsParked() {
+        capturedThisMonth(900_000);
+        assertThat(at(NOW).checkCapture(wallet("0.00"), MIN, Money.parse("1000.01")))
+                .contains(ParkReason.MONTHLY_LOAD);
+    }
+
+    @Test
+    void captureIgnoresOpenTopupsBecauseTheyReservedTheirOwnRoom() {
+        capturedThisMonth(0);
+        open(1_000_000); // even the whole cap reserved by open top-ups (this one included) doesn't matter
+        assertThat(at(NOW).checkCapture(wallet("0.00"), MIN, Money.parse("10000.00"))).isEmpty();
+    }
+
+    @Test
+    void captureToAFrozenOrClosedWalletIsParked() {
+        assertThat(at(NOW).checkCapture(wallet("0.00", WalletStatus.FROZEN), MIN, Money.parse("1.00")))
+                .contains(ParkReason.WALLET_NOT_ACTIVE);
+        assertThat(at(NOW).checkCapture(wallet("0.00", WalletStatus.CLOSED), MIN, Money.parse("1.00")))
+                .contains(ParkReason.WALLET_NOT_ACTIVE);
+    }
+
+    @Test
+    void captureCountsTheCurrentIndianMonth() {
+        // 31 Oct 2026 19:00 UTC is already 1 Nov in India: the month starts 31 Oct 18:30 UTC.
+        capturedThisMonth(1_000_000);
+        assertThat(at("2026-10-31T19:00:00Z").checkCapture(wallet("0.00"), MIN, Money.parse("1.00")))
+                .contains(ParkReason.MONTHLY_LOAD);
     }
 
     @Test

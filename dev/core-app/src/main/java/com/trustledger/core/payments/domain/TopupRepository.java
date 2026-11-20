@@ -2,6 +2,7 @@ package com.trustledger.core.payments.domain;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,6 +14,18 @@ public interface TopupRepository {
     Topup saveAndFlush(Topup topup);
 
     Optional<Topup> findById(UUID id);
+
+    /**
+     * The top-up of a gateway order, row-locked ({@code SELECT ... FOR UPDATE}) until the transaction ends. Settling a
+     * payment locks the top-up first, then its wallet; every settlement path takes them in that order.
+     */
+    Optional<Topup> findByGatewayOrderIdForUpdate(String gatewayOrderId);
+
+    /** The top-up by ID, row-locked until the transaction ends. */
+    Optional<Topup> findByIdForUpdate(UUID id);
+
+    /** At most {@code limit} PENDING top-ups created before {@code createdBefore}, oldest first (FR-P-6). */
+    List<Topup> findPendingCreatedBefore(Instant createdBefore, int limit);
 
     /**
      * Sum in minor units of the wallet's top-ups created at or after {@code fromInclusive} with one of the statuses

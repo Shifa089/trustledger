@@ -60,6 +60,7 @@ class TopupsMigrationIT {
         insert("FAILED", null, null, null);
         insert("FAILED", unique("order_"), null, null);
         insert("EXPIRED", unique("order_"), null, null);
+        insert("PARKED", unique("order_"), unique("pay_"), UUID.randomUUID());
     }
 
     @Test
@@ -100,6 +101,35 @@ class TopupsMigrationIT {
                 .isInstanceOf(DuplicateKeyException.class).hasMessageContaining("uk_topups_gateway_payment");
         assertThatThrownBy(() -> insert("CAPTURED", unique("order_"), unique("pay_"), entry))
                 .isInstanceOf(DuplicateKeyException.class).hasMessageContaining("uk_topups_journal_entry");
+    }
+
+    // --- V15: PARKED and the reconciler index ---
+
+    @Test
+    void parkedIsAcceptedWithOrderPaymentAndJournalEntry() {
+        insert("PARKED", unique("order_"), unique("pay_"), UUID.randomUUID());
+    }
+
+    @Test
+    void parkedNeedsOrderPaymentAndJournalEntry() {
+        refusedBy(() -> insert("PARKED", null, unique("pay_"), UUID.randomUUID()), "ck_topups_order_id");
+        refusedBy(() -> insert("PARKED", unique("order_"), unique("pay_"), null), "ck_topups_journal_entry");
+        refusedBy(() -> insert("PARKED", unique("order_"), null, UUID.randomUUID()), "ck_topups_payment_id");
+    }
+
+    @Test
+    void onlyCapturedAndParkedCarryAPaymentOrAJournalEntry() {
+        refusedBy(() -> insert("EXPIRED", unique("order_"), unique("pay_"), UUID.randomUUID()),
+                "ck_topups_journal_entry");
+        refusedBy(() -> insert("FAILED", unique("order_"), null, UUID.randomUUID()), "ck_topups_journal_entry");
+    }
+
+    @Test
+    void pendingTopupsAreIndexedByAgeForTheReconciler() {
+        String definition = jdbc.queryForObject("""
+                select indexdef from pg_indexes where schemaname = 'payments' and indexname = 'ix_topups_pending_created'""",
+                String.class);
+        assertThat(definition).contains("(created_at)").contains("WHERE").contains("'PENDING'");
     }
 
     @Test

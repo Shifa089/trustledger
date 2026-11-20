@@ -23,13 +23,15 @@ import org.hibernate.annotations.UuidGenerator;
  * Money added to a wallet through the payment gateway (FR-P-4): the aggregate that guards the top-up's state machine.
  * <pre>
  * CREATED --markPending--&gt; PENDING --capture--&gt; CAPTURED
+ *                                  --park-----&gt; PARKED    (paid, but the wallet could not take it: ADR 0006)
  *                                  --fail-----&gt; FAILED
  *                                  --expire---&gt; EXPIRED
  * CREATED --fail--------------------------------&gt; FAILED   (the gateway order could not be created)
+ * FAILED, EXPIRED (with an order) --capture/park--&gt; CAPTURED/PARKED   (late capture)
  * </pre>
  * Any other step throws {@link ErrorCode#INVALID_STATE_TRANSITION}. Invariants, also enforced by database checks
- * ({@code V13}): a positive INR amount, an order ID from PENDING on, and a payment ID and journal entry exactly when
- * CAPTURED.
+ * ({@code V13}, {@code V15}): a positive INR amount, an order ID from PENDING on, and a payment ID and journal entry
+ * exactly when CAPTURED or PARKED.
  * <p>
  * CREATED is committed <em>before</em> the gateway is called, so the gateway call never runs inside a database
  * transaction (CLAUDE.md: no remote calls while holding locks).
@@ -116,14 +118,42 @@ public class Topup {
         moveTo(TopupStatus.FAILED, now);
     }
 
-    /** PENDING -> CAPTURED: the payment was captured and the ledger entry posted. */
+    /**
+     * PENDING (or, late, FAILED / EXPIRED) -> CAPTURED: the payment was captured and credited to the wallet
+     * (GATEWAY_CLEARING -> WALLET posted).
+     */
     public void capture(String gatewayPaymentId, UUID journalEntryId, Instant now) {
+        settle("capture", gatewayPaymentId, journalEntryId, TopupStatus.CAPTURED, now);
+    }
+
+    /**
+     * PENDING (or, late, FAILED / EXPIRED) -> PARKED: the payment was captured but the wallet could not take it, so
+     * the money was booked to suspense (GATEWAY_CLEARING -> SUSPENSE posted). ADR 0006.
+     */
+    public void park(String gatewayPaymentId, UUID journalEntryId, Instant now) {
+        settle("park", gatewayPaymentId, journalEntryId, TopupStatus.PARKED, now);
+    }
+
+    /** Whether a captured payment can still settle this top-up ({@link TopupStatus#SETTLEABLE}, with an order). */
+    public boolean isSettleable() {
+        return TopupStatus.SETTLEABLE.contains(status) && gatewayOrderId != null;
+    }
+
+    /** Whether a captured payment was already booked for it: CAPTURED or PARKED. */
+    public boolean isSettled() {
+        return TopupStatus.SETTLED.contains(status);
+    }
+
+    private void settle(String action, String gatewayPaymentId, UUID journalEntryId, TopupStatus target,
+            Instant now) {
         PaymentGateway.requirePaymentId(gatewayPaymentId);
         Objects.requireNonNull(journalEntryId, "journalEntryId");
-        requireStatus("capture", TopupStatus.PENDING);
+        if (!isSettleable()) {
+            throw invalid(action);
+        }
         this.gatewayPaymentId = gatewayPaymentId;
         this.journalEntryId = journalEntryId;
-        moveTo(TopupStatus.CAPTURED, now);
+        moveTo(target, now);
     }
 
     /** PENDING -> EXPIRED: nobody paid the order in time (FR-P-6). */

@@ -45,6 +45,11 @@ class TopupTest {
                 topup.capture(PAYMENT, ENTRY, T0);
                 yield topup;
             }
+            case PARKED -> {
+                Topup topup = pending();
+                topup.park(PAYMENT, ENTRY, T0);
+                yield topup;
+            }
             case FAILED -> {
                 Topup topup = created();
                 topup.fail(T0);
@@ -157,15 +162,81 @@ class TopupTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = TopupStatus.class, names = {"CAPTURED", "FAILED", "EXPIRED"})
+    @EnumSource(value = TopupStatus.class, names = {"CAPTURED", "PARKED", "FAILED", "EXPIRED"})
     void finishedTopupsCannotFail(TopupStatus status) {
         invalidTransition(in(status), t -> t.fail(T1));
     }
 
     @ParameterizedTest
-    @EnumSource(value = TopupStatus.class, names = "PENDING", mode = EnumSource.Mode.EXCLUDE)
-    void onlyPendingCanBeCaptured(TopupStatus status) {
+    @EnumSource(value = TopupStatus.class, names = {"CREATED", "CAPTURED", "PARKED"})
+    void createdAndSettledTopupsCannotBeCaptured(TopupStatus status) {
         invalidTransition(in(status), t -> t.capture(PAYMENT, ENTRY, T1));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TopupStatus.class, names = {"CREATED", "CAPTURED", "PARKED"})
+    void createdAndSettledTopupsCannotBeParked(TopupStatus status) {
+        invalidTransition(in(status), t -> t.park(PAYMENT, ENTRY, T1));
+    }
+
+    @Test
+    void failedWithoutAnOrderCannotBeSettled() {
+        Topup topup = in(TopupStatus.FAILED); // failed before the gateway order existed
+        assertThat(topup.isSettleable()).isFalse();
+        invalidTransition(topup, t -> t.capture(PAYMENT, ENTRY, T1));
+    }
+
+    // --- settlement (M7 part 3b) ---
+
+    @Test
+    void parkRecordsPaymentAndJournalEntry() {
+        Topup topup = pending();
+        topup.park(PAYMENT, ENTRY, T1);
+
+        assertThat(topup.getStatus()).isEqualTo(TopupStatus.PARKED);
+        assertThat(topup.getGatewayPaymentId()).isEqualTo(PAYMENT);
+        assertThat(topup.getJournalEntryId()).isEqualTo(ENTRY);
+        assertThat(topup.getUpdatedAt()).isEqualTo(T1);
+        assertThat(topup.isSettled()).isTrue();
+    }
+
+    @Test
+    void lateCaptureAfterAFailedAttemptOnTheSameOrder() {
+        Topup topup = pending();
+        topup.fail(T0);
+        assertThat(topup.isSettleable()).isTrue();
+
+        topup.capture(PAYMENT, ENTRY, T1);
+        assertThat(topup.getStatus()).isEqualTo(TopupStatus.CAPTURED);
+    }
+
+    @Test
+    void lateCaptureAfterExpiry() {
+        Topup topup = in(TopupStatus.EXPIRED);
+        topup.capture(PAYMENT, ENTRY, T1);
+        assertThat(topup.getStatus()).isEqualTo(TopupStatus.CAPTURED);
+    }
+
+    @Test
+    void lateParkAfterExpiry() {
+        Topup topup = in(TopupStatus.EXPIRED);
+        topup.park(PAYMENT, ENTRY, T1);
+        assertThat(topup.getStatus()).isEqualTo(TopupStatus.PARKED);
+    }
+
+    @Test
+    void settledAndSettleableSets() {
+        assertThat(TopupStatus.SETTLEABLE)
+                .containsExactlyInAnyOrder(TopupStatus.PENDING, TopupStatus.FAILED, TopupStatus.EXPIRED);
+        assertThat(TopupStatus.SETTLED).containsExactlyInAnyOrder(TopupStatus.CAPTURED, TopupStatus.PARKED);
+        assertThat(pending().isSettled()).isFalse();
+        assertThat(in(TopupStatus.CAPTURED).isSettled()).isTrue();
+    }
+
+    @Test
+    void parkValidatesItsArguments() {
+        assertThatIllegalArgumentException().isThrownBy(() -> pending().park("order_NOTAPAY0001", ENTRY, T1));
+        assertThatNullPointerException().isThrownBy(() -> pending().park(PAYMENT, null, T1));
     }
 
     @ParameterizedTest

@@ -157,6 +157,27 @@ class PaymentsFixtures {
         return jdbc.queryForObject("select status from payments.topups where id = ?", String.class, topupId);
     }
 
+    /** Number of TOPUP journal entries posted for the top-up (the unique reference allows at most one). */
+    long topupEntries(UUID topupId) {
+        return jdbc.queryForObject("select count(*) from ledger.journal_entries where reference_type = 'TOPUP'"
+                + " and reference_id = ? and entry_type = 'TOPUP'", Long.class, topupId);
+    }
+
+    /** The lines of the top-up's journal entry as {@code "ACCOUNT DIRECTION amountMinor"}, in line order. */
+    List<String> topupEntryLines(UUID topupId) {
+        return jdbc.queryForList("""
+                select a.code || ' ' || l.direction || ' ' || l.amount_minor
+                from payments.topups t
+                join ledger.journal_lines l on l.entry_id = t.journal_entry_id
+                join ledger.ledger_accounts a on a.id = l.account_id
+                where t.id = ? order by l.line_no""", String.class, topupId);
+    }
+
+    String topupPaymentId(UUID topupId) {
+        return jdbc.queryForObject("select gateway_payment_id from payments.topups where id = ?", String.class,
+                topupId);
+    }
+
     String topupOrderId(UUID topupId) {
         return jdbc.queryForObject("select gateway_order_id from payments.topups where id = ?", String.class,
                 topupId);
