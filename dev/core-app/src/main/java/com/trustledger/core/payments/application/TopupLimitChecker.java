@@ -10,7 +10,9 @@ import com.trustledger.core.wallet.WalletView;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 /**
@@ -63,6 +65,36 @@ public class TopupLimitChecker {
                     "This top-up would take your balance above the maximum of "
                             + limits.maxBalance().toDecimalString() + ".");
         }
+    }
+
+    /**
+     * The re-check when a captured payment arrives (M7): can the wallet take {@code amount} <em>now</em>? Unlike
+     * {@link #check}, open top-ups are not counted: they reserved their own room when they were created, and the one
+     * being captured is itself still open. What can have changed since creation: the wallet was frozen or closed,
+     * the tier went down, money arrived by P2P transfer, or the top-up is a late capture (FAILED or EXPIRED top-ups
+     * hold no room). Landing exactly on a limit is allowed.
+     * <p>
+     * <b>Call it while holding the wallet's row lock.</b>
+     *
+     * @param wallet a snapshot taken under the wallet's row lock
+     * @return empty if the wallet can be credited, else why not
+     */
+    public Optional<ParkReason> checkCapture(WalletView wallet, WalletLimits limits, Money amount) {
+        Objects.requireNonNull(wallet, "wallet");
+        Objects.requireNonNull(limits, "limits");
+        Objects.requireNonNull(amount, "amount");
+        if (!wallet.isActive()) {
+            return Optional.of(ParkReason.WALLET_NOT_ACTIVE);
+        }
+        if (Math.addExact(wallet.balance().amountMinor(), amount.amountMinor()) > limits.maxBalance().amountMinor()) {
+            return Optional.of(ParkReason.MAX_BALANCE);
+        }
+        long captured = topups.sumCreatedSince(wallet.walletId(), monthStart(clock.instant()),
+                EnumSet.of(TopupStatus.CAPTURED));
+        if (Math.addExact(captured, amount.amountMinor()) > limits.monthlyLoad().amountMinor()) {
+            return Optional.of(ParkReason.MONTHLY_LOAD);
+        }
+        return Optional.empty();
     }
 
     /** Start of the limit month that contains {@code now}, in the limit zone. */

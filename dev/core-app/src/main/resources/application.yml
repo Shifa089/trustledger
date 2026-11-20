@@ -99,6 +99,15 @@ trustledger:
     # body size is capped; larger bodies get 413 and are not stored. Razorpay's payment events are a few KB.
     webhooks:
       max-body-size: 64KB
+    # PendingTopupReconciler (FR-P-6): every 5 minutes, PENDING top-ups older than pending-after are looked up at
+    # Razorpay (fetch order payments); captured -> credited (or parked, ADR 0006); nothing captured after
+    # expire-after -> EXPIRED. batch-size: top-ups per run, oldest first. ShedLock lock: one instance at a time.
+    reconciler:
+      cron: "0 */5 * * * *"
+      pending-after: 15m
+      expire-after: 24h
+      batch-size: 100
+      lock-at-most-for: 10m
   # Razorpay in TEST MODE ONLY (M7, ADR 0014). Keys come from the environment (.env locally, Secrets Manager on
   # AWS). Startup fails on a live key (anything not rzp_test_...), a blank secret, or plain http to a remote host.
   # timeout: per attempt (TimeLimiter + socket read). The circuit opens when 50% of the last 10 calls failed

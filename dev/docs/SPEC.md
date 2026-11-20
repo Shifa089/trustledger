@@ -236,7 +236,7 @@ One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`,
 | `ledger.journal_lines` | `id`, `entry_id`, `account_id`, `direction` (DEBIT, CREDIT), `amount_minor`, `line_no` | Check `amount_minor > 0`; index on (`account_id`, `entry_id`) |
 | `shared.shedlock` | `name`, `lock_until`, `locked_at`, `locked_by` | ShedLock's lock table (ADR 0013): one row per scheduled job, e.g. `wallet-reconciliation`. Times come from the database clock |
 | `payments.transfers` | `id`, `sender_wallet_id`, `receiver_wallet_id`, `amount_minor`, `note`, `status` (INITIATED, HELD\_FOR\_REVIEW, COMPLETED, REJECTED, FAILED, REVERSED), `journal_entry_id`, `reviewed_by`, `reviewed_at`, `currency`, `version` | Index on (`sender_wallet_id`, `created_at`) for limit checks and history; `amount_minor > 0`; sender ≠ receiver; `journal_entry_id` set iff COMPLETED/REVERSED (and unique); `reviewed_by`/`reviewed_at` together, required for REJECTED |
-| `payments.topups` | `id`, `wallet_id`, `amount_minor`, `gateway_order_id`, `gateway_payment_id`, `status` (CREATED, PENDING, CAPTURED, FAILED, EXPIRED), `journal_entry_id`, `version` | `gateway_order_id` unique |
+| `payments.topups` | `id`, `wallet_id`, `amount_minor`, `gateway_order_id`, `gateway_payment_id`, `status` (CREATED, PENDING, CAPTURED, PARKED, FAILED, EXPIRED), `journal_entry_id`, `version` | `gateway_order_id` unique; payment ID and journal entry exactly when CAPTURED or PARKED. PARKED: paid, but the wallet couldn't take it at capture time (over a limit, frozen or closed), so the money went to suspense (ADR 0006). A captured payment also settles a FAILED or EXPIRED top-up (late capture); partial index on `created_at WHERE status = 'PENDING'` for the reconciler |
 | `payments.webhook_events` | `id`, `gateway_event_id`, `event_type`, `payload` (jsonb, personal fields removed), `signature_valid`, `received_at`, `processed_at` | `gateway_event_id` unique **among accepted rows** (partial index `WHERE signature_valid`), so a forged delivery stored as invalid can't block the genuine event; every delivery is stored; `processed_at` only on accepted rows |
 | `payments.idempotency_keys` | `user_id`, `idem_key`, `request_hash`, `status` (IN\_PROGRESS, COMPLETED), `response_status`, `response_body` (jsonb), `expires_at` | Primary key (`user_id`, `idem_key`); kept 24 hours; index on `expires_at` for the hourly cleanup job; a response is stored only for 2xx, any other outcome deletes the key |
 | `audit.audit_events` | `seq` (bigserial), `occurred_at`, `actor_id`, `actor_role`, `action`, `entity_type`, `entity_id`, `before`/`after` (jsonb, masked), `ip`, `correlation_id`, `prev_hash`, `hash` | Append-only; `hash` = SHA-256 of `prev_hash` + the event's canonical JSON |
@@ -257,6 +257,7 @@ One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`,
 | Business event | Debit | Credit |
 | --- | --- | --- |
 | Top-up captured (₹X) | `PLATFORM:GATEWAY_CLEARING` (asset) ₹X | `WALLET:<id>` (liability) ₹X |
+| Top-up captured but over a limit / wallet frozen or closed (₹X), ADR 0006 | `PLATFORM:GATEWAY_CLEARING` (asset) ₹X | `PLATFORM:SUSPENSE` (liability) ₹X |
 | P2P transfer (₹X) | `WALLET:<sender>` ₹X | `WALLET:<receiver>` ₹X |
 | Reversal of entry E | Each credit line of E | Each debit line of E |
 
@@ -639,7 +640,7 @@ Goal: a real payment-gateway integration with webhooks, retries and reconciliati
 - A tiny `checkout.html` page (served locally) opens Razorpay Checkout in test mode.
 - `POST /webhooks/razorpay`: verify the HMAC-SHA256 signature over the **raw body**, store the event, de-duplicate by event ID, process `payment.captured` / `payment.failed`.
 - Top-up state machine; ledger posting on capture; limits checked (monthly load, balance cap); over-limit captured payments are refunded or parked in a suspense account (document your choice in an ADR).
-- Scheduled check of PENDING top-ups older than 15 minutes (FR-P-6).
+- Scheduled check of PENDING top-ups older than 15 minutes (FR-P-6). Implemented as `PendingTopupReconciler`: every 5 minutes (ShedLock), captured → credited (or parked), nothing captured after 24 hours → EXPIRED, gateway errors → tried again next run.
 
 Done when: WireMock-based tests cover order creation, gateway timeout (503 GATEWAY\_UNAVAILABLE, circuit opens), invalid signature (rejected, stored as invalid), duplicate webhook (credited once), out-of-order events, and the reconciliation job. One manual end-to-end test payment in Razorpay test mode works.
 
