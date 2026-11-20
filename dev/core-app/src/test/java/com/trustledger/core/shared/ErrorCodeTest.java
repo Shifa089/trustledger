@@ -36,6 +36,8 @@ class ErrorCodeTest {
             "GATEWAY_UNAVAILABLE, 503",
             "GATEWAY_REJECTED, 502",
             "STORAGE_UNAVAILABLE, 503",
+            "WEBHOOK_SIGNATURE_INVALID, 400",
+            "PAYLOAD_TOO_LARGE, 413",
             "NOT_IMPLEMENTED, 501",
             "UNSUPPORTED_REQUEST, 400",
             "INTERNAL_ERROR, 500"

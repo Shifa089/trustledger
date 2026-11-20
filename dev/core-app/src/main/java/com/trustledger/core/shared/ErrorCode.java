@@ -42,6 +42,10 @@ public enum ErrorCode {
     GATEWAY_REJECTED(HttpStatus.BAD_GATEWAY, "Payment gateway rejected the request"),
     /** Document storage (S3) could not be reached or refused the request. */
     STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Document storage unavailable"),
+    /** A gateway webhook whose signature did not match the raw body (FR-P-5). Stored as rejected, never processed. */
+    WEBHOOK_SIGNATURE_INVALID(HttpStatus.BAD_REQUEST, "Webhook signature invalid"),
+    /** Request body larger than the endpoint accepts (webhooks: trustledger.payments.webhooks.max-body-size). */
+    PAYLOAD_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "Payload too large"),
     /** Endpoint declared but not built yet (stubs such as POST /transfers until M6). */
     NOT_IMPLEMENTED(HttpStatus.NOT_IMPLEMENTED, "Not implemented"),
     /** Framework-level 405/406/415; the handler keeps the framework's actual status. */

@@ -38,7 +38,8 @@ class IdempotencyServiceTest {
     static PaymentsProperties properties() {
         return new PaymentsProperties(ZoneId.of("Asia/Kolkata"), new PaymentsProperties.Idempotency(
                 Duration.ofHours(24), DataSize.ofKilobytes(16), "0 15 * * * *", 1000, Duration.ofMinutes(10)),
-                new PaymentsProperties.Topups(Money.of(100, Money.INR), false));
+                new PaymentsProperties.Topups(Money.of(100, Money.INR), false),
+                new PaymentsProperties.Webhooks(DataSize.ofKilobytes(64)));
     }
 
     private final IdempotencyKeyRepository keys = mock(IdempotencyKeyRepository.class);
