@@ -198,6 +198,9 @@ class SecurityMatrixIT {
             "GET, /api/v1/ping,                           NONE,               401",
             "GET, /api/v1/ping,                           AUDITOR,            200",
             "POST, /api/v1/webhooks/probe,                NONE,               200",
+            // Razorpay webhook (M7): public, so any caller reaches the HMAC check; no signature -> 400.
+            "POST, /api/v1/webhooks/razorpay,             NONE,               400",
+            "POST, /api/v1/webhooks/razorpay,             CUSTOMER,           400",
             "GET, /actuator/health,                       NONE,               200",
             "GET, /actuator/env,                          NONE,               401",
             "GET, /actuator/env,                          CUSTOMER,           403",

@@ -16,14 +16,16 @@ import org.springframework.util.unit.DataSize;
  *                    load limit ({@code Asia/Kolkata}: an Indian customer's day, not UTC's)
  * @param idempotency the {@code Idempotency-Key} settings
  * @param topups      the top-up settings (M7)
+ * @param webhooks    the gateway webhook settings (M7)
  */
 @ConfigurationProperties("trustledger.payments")
-public record PaymentsProperties(ZoneId limitZone, Idempotency idempotency, Topups topups) {
+public record PaymentsProperties(ZoneId limitZone, Idempotency idempotency, Topups topups, Webhooks webhooks) {
 
     public PaymentsProperties {
         Objects.requireNonNull(limitZone, "trustledger.payments.limit-zone is required");
         Objects.requireNonNull(idempotency, "trustledger.payments.idempotency is required");
         Objects.requireNonNull(topups, "trustledger.payments.topups is required");
+        Objects.requireNonNull(webhooks, "trustledger.payments.webhooks is required");
     }
 
     /**
@@ -76,6 +78,23 @@ public record PaymentsProperties(ZoneId limitZone, Idempotency idempotency, Topu
             if (minAmount == null || !Money.INR.equals(minAmount.currency()) || minAmount.isZero()) {
                 throw new IllegalArgumentException(
                         "trustledger.payments.topups.min-amount must be a positive INR amount");
+            }
+        }
+    }
+
+    /**
+     * @param maxBodySize largest webhook body accepted (larger: 413, not stored); between 1 KB and 1 MB. The
+     *                    endpoint is public and stores every delivery, so this bounds what one request can write.
+     */
+    public record Webhooks(DataSize maxBodySize) {
+
+        public static final DataSize MIN_BODY = DataSize.ofKilobytes(1);
+        public static final DataSize MAX_BODY = DataSize.ofMegabytes(1);
+
+        public Webhooks {
+            if (maxBodySize == null || maxBodySize.compareTo(MIN_BODY) < 0 || maxBodySize.compareTo(MAX_BODY) > 0) {
+                throw new IllegalArgumentException(
+                        "trustledger.payments.webhooks.max-body-size must be between 1KB and 1MB");
             }
         }
     }

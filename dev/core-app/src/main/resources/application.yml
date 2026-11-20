@@ -95,6 +95,10 @@ trustledger:
     topups:
       min-amount: "1.00"
       checkout-page: false
+    # Razorpay webhooks (M7, FR-P-5). The endpoint is public and stores every delivery (accepted or not), so the
+    # body size is capped; larger bodies get 413 and are not stored. Razorpay's payment events are a few KB.
+    webhooks:
+      max-body-size: 64KB
   # Razorpay in TEST MODE ONLY (M7, ADR 0014). Keys come from the environment (.env locally, Secrets Manager on
   # AWS). Startup fails on a live key (anything not rzp_test_...), a blank secret, or plain http to a remote host.
   # timeout: per attempt (TimeLimiter + socket read). The circuit opens when 50% of the last 10 calls failed

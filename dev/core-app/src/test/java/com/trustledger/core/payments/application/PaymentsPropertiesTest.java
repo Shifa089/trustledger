@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import com.trustledger.core.payments.application.PaymentsProperties.Idempotency;
 import com.trustledger.core.payments.application.PaymentsProperties.Topups;
+import com.trustledger.core.payments.application.PaymentsProperties.Webhooks;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.config.MoneyPropertyConverter;
 import java.util.Currency;
@@ -28,6 +29,7 @@ class PaymentsPropertiesTest {
     private static final String CRON = "0 15 * * * *";
     private static final Duration TEN_MIN = Duration.ofMinutes(10);
     private static final Topups TOPUPS = new Topups(Money.of(100, Money.INR), false);
+    private static final Webhooks WEBHOOKS = new Webhooks(DataSize.ofKilobytes(64));
 
     @Test
     void defaultsAreValid() {
@@ -64,11 +66,25 @@ class PaymentsPropertiesTest {
     }
 
     @Test
-    void zoneIdempotencyAndTopupsAreRequired() {
+    void zoneIdempotencyTopupsAndWebhooksAreRequired() {
         Idempotency valid = idempotency(DAY, KB16, CRON, 1, TEN_MIN);
-        assertThatNullPointerException().isThrownBy(() -> new PaymentsProperties(null, valid, TOPUPS));
-        assertThatNullPointerException().isThrownBy(() -> new PaymentsProperties(ZoneId.of("Asia/Kolkata"), null, TOPUPS));
-        assertThatNullPointerException().isThrownBy(() -> new PaymentsProperties(ZoneId.of("Asia/Kolkata"), valid, null));
+        ZoneId ist = ZoneId.of("Asia/Kolkata");
+        assertThatNullPointerException().isThrownBy(() -> new PaymentsProperties(null, valid, TOPUPS, WEBHOOKS));
+        assertThatNullPointerException().isThrownBy(() -> new PaymentsProperties(ist, null, TOPUPS, WEBHOOKS));
+        assertThatNullPointerException().isThrownBy(() -> new PaymentsProperties(ist, valid, null, WEBHOOKS));
+        assertThatNullPointerException().isThrownBy(() -> new PaymentsProperties(ist, valid, TOPUPS, null))
+                .withMessageContaining("webhooks");
+    }
+
+    @Test
+    void webhookBodyLimitMustBeBetweenOneKilobyteAndOneMegabyte() {
+        assertThat(new Webhooks(DataSize.ofKilobytes(1)).maxBodySize()).isEqualTo(DataSize.ofKilobytes(1));
+        assertThat(new Webhooks(DataSize.ofMegabytes(1)).maxBodySize()).isEqualTo(DataSize.ofMegabytes(1));
+        assertThatIllegalArgumentException().isThrownBy(() -> new Webhooks(DataSize.ofBytes(1023)))
+                .withMessageContaining("webhooks.max-body-size");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Webhooks(DataSize.ofBytes(1024 * 1024 + 1)))
+                .withMessageContaining("webhooks.max-body-size");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Webhooks(null));
     }
 
     @Test
@@ -99,13 +115,15 @@ class PaymentsPropertiesTest {
                     "trustledger.payments.idempotency.cleanup-cron=0 15 * * * *",
                     "trustledger.payments.idempotency.cleanup-batch-size=1000",
                     "trustledger.payments.idempotency.lock-at-most-for=10m",
-                    "trustledger.payments.topups.min-amount=1.00");
+                    "trustledger.payments.topups.min-amount=1.00",
+                    "trustledger.payments.webhooks.max-body-size=64KB");
 
     @Test
     void bindsFromConfiguration() {
         runner.run(context -> {
             assertThat(context).hasNotFailed();
             PaymentsProperties properties = context.getBean(PaymentsProperties.class);
+            assertThat(properties.webhooks().maxBodySize()).isEqualTo(DataSize.ofKilobytes(64));
             assertThat(properties.limitZone()).isEqualTo(ZoneId.of("Asia/Kolkata"));
             assertThat(properties.idempotency().ttl()).isEqualTo(DAY);
             assertThat(properties.idempotency().maxBodySize()).isEqualTo(KB16);
@@ -125,6 +143,8 @@ class PaymentsPropertiesTest {
         runner.withPropertyValues("trustledger.payments.idempotency.ttl=10m")
                 .run(context -> assertThat(context).hasFailed());
         runner.withPropertyValues("trustledger.payments.limit-zone=Mars/Olympus")
+                .run(context -> assertThat(context).hasFailed());
+        runner.withPropertyValues("trustledger.payments.webhooks.max-body-size=2MB")
                 .run(context -> assertThat(context).hasFailed());
     }
 }

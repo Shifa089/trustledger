@@ -237,7 +237,7 @@ One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`,
 | `shared.shedlock` | `name`, `lock_until`, `locked_at`, `locked_by` | ShedLock's lock table (ADR 0013): one row per scheduled job, e.g. `wallet-reconciliation`. Times come from the database clock |
 | `payments.transfers` | `id`, `sender_wallet_id`, `receiver_wallet_id`, `amount_minor`, `note`, `status` (INITIATED, HELD\_FOR\_REVIEW, COMPLETED, REJECTED, FAILED, REVERSED), `journal_entry_id`, `reviewed_by`, `reviewed_at`, `currency`, `version` | Index on (`sender_wallet_id`, `created_at`) for limit checks and history; `amount_minor > 0`; sender ≠ receiver; `journal_entry_id` set iff COMPLETED/REVERSED (and unique); `reviewed_by`/`reviewed_at` together, required for REJECTED |
 | `payments.topups` | `id`, `wallet_id`, `amount_minor`, `gateway_order_id`, `gateway_payment_id`, `status` (CREATED, PENDING, CAPTURED, FAILED, EXPIRED), `journal_entry_id`, `version` | `gateway_order_id` unique |
-| `payments.webhook_events` | `id`, `gateway_event_id`, `event_type`, `payload` (jsonb), `signature_valid`, `processed_at` | `gateway_event_id` unique (de-duplication) |
+| `payments.webhook_events` | `id`, `gateway_event_id`, `event_type`, `payload` (jsonb, personal fields removed), `signature_valid`, `received_at`, `processed_at` | `gateway_event_id` unique **among accepted rows** (partial index `WHERE signature_valid`), so a forged delivery stored as invalid can't block the genuine event; every delivery is stored; `processed_at` only on accepted rows |
 | `payments.idempotency_keys` | `user_id`, `idem_key`, `request_hash`, `status` (IN\_PROGRESS, COMPLETED), `response_status`, `response_body` (jsonb), `expires_at` | Primary key (`user_id`, `idem_key`); kept 24 hours; index on `expires_at` for the hourly cleanup job; a response is stored only for 2xx, any other outcome deletes the key |
 | `audit.audit_events` | `seq` (bigserial), `occurred_at`, `actor_id`, `actor_role`, `action`, `entity_type`, `entity_id`, `before`/`after` (jsonb, masked), `ip`, `correlation_id`, `prev_hash`, `hash` | Append-only; `hash` = SHA-256 of `prev_hash` + the event's canonical JSON |
 | `privacy.data_requests` | `id`, `user_id`, `type` (EXPORT, ERASURE), `status`, `result_s3_key` | - |
@@ -345,12 +345,13 @@ All endpoints sit under `/api/v1` (path versioning configured with Spring Framew
 | errorCode | HTTP status |
 | --- | --- |
 | VALIDATION\_FAILED (with a `violations` list) | 400 |
+| WEBHOOK\_SIGNATURE\_INVALID (webhook HMAC does not match the raw body) | 400 |
 | UNAUTHENTICATED / ACCESS\_DENIED / KYC\_REQUIRED | 401 / 403 / 403 |
 | NOT\_FOUND | 404 |
 | REQUEST\_IN\_PROGRESS / MAKER\_CHECKER\_VIOLATION / WALLET\_FROZEN | 409 |
 | INVALID\_STATE\_TRANSITION / KYC\_ALREADY\_SUBMITTED / KYC\_DOCUMENTS\_MISSING / CONCURRENT\_MODIFICATION | 409 |
 | DUPLICATE\_POSTING (business event or reversal already in the ledger) | 409 |
-| DOCUMENT\_TOO\_LARGE / UNSUPPORTED\_DOCUMENT\_TYPE | 413 / 415 |
+| DOCUMENT\_TOO\_LARGE / PAYLOAD\_TOO\_LARGE / UNSUPPORTED\_DOCUMENT\_TYPE | 413 / 413 / 415 |
 | INSUFFICIENT\_FUNDS / LIMIT\_EXCEEDED / IDEMPOTENCY\_KEY\_REUSED | 422 |
 | RATE\_LIMITED | 429 |
 | GATEWAY\_REJECTED (the gateway refused our request; retrying will not help) | 502 |
