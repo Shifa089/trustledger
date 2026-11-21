@@ -207,6 +207,23 @@ trustledger:
       create: false
       partitions: 3
       replicas: 1
+  # FR-N-1 notification e-mails (M8). The SMTP server is spring.mail.* below. zone: times shown in e-mails.
+  notification:
+    from: ${TRUSTLEDGER_MAIL_FROM:no-reply@trustledger.local}
+    zone: Asia/Kolkata
+
+# SMTP for notifications (ADR 0017): Mailpit locally (infra/docker-compose.yml), per environment elsewhere.
+# Bounded timeouts: the mail is sent by an asynchronous module listener after the business transaction commits; a
+# hanging SMTP server must fail fast (the notification is then recorded FAILED) instead of tying up that thread and
+# its database connection.
+spring.mail:
+  host: ${TRUSTLEDGER_SMTP_HOST:localhost}
+  port: ${TRUSTLEDGER_SMTP_PORT:1025}
+  default-encoding: UTF-8
+  properties:
+    mail.smtp.connectiontimeout: 5000
+    mail.smtp.timeout: 5000
+    mail.smtp.writetimeout: 5000
 
 ---
 # Every profile except local: structured JSON console logs (Elastic Common Schema).

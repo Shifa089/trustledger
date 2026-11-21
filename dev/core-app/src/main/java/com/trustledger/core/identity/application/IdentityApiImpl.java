@@ -1,9 +1,11 @@
 package com.trustledger.core.identity.application;
 
 import com.trustledger.core.identity.IdentityApi;
+import com.trustledger.core.identity.NotificationContact;
 import com.trustledger.core.identity.UserView;
 import com.trustledger.core.identity.domain.User;
 import com.trustledger.core.identity.domain.UserRepository;
+import com.trustledger.core.identity.domain.UserStatus;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.TrustLedgerException;
 import com.trustledger.core.shared.crypto.BlindIndex;
@@ -47,6 +49,24 @@ class IdentityApiImpl implements IdentityApi {
             return Optional.empty();
         }
         return users.findByPhoneHash(hash).map(IdentityApiImpl::view);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<UserView> findUser(UUID userId) {
+        return userId == null ? Optional.empty() : users.findById(userId).map(IdentityApiImpl::view);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<NotificationContact> findNotificationContact(UUID userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+        return users.findById(userId)
+                .filter(user -> user.getStatus() == UserStatus.ACTIVE)
+                .filter(user -> user.getEmail() != null && !user.getEmail().isBlank())
+                .map(user -> new NotificationContact(user.getId(), user.getEmail()));
     }
 
     @Override

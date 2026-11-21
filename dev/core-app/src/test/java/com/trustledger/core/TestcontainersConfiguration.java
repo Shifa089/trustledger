@@ -8,6 +8,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.localstack.LocalStackContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -41,6 +42,30 @@ public class TestcontainersConfiguration {
     @ServiceConnection
     KafkaContainer kafkaContainer() {
         return new KafkaContainer(DockerImageName.parse("apache/kafka:4.4.0"));
+    }
+
+    /**
+     * SMTP sink for notification e-mails (FR-N-1); same image as infra/docker-compose.yml. Tests read what arrived
+     * through its HTTP API ({@link MailpitClient}).
+     */
+    @Bean
+    GenericContainer<?> mailpitContainer() {
+        return new GenericContainer<>(DockerImageName.parse(MailpitClient.IMAGE))
+                .withExposedPorts(MailpitClient.SMTP_PORT, MailpitClient.HTTP_PORT)
+                .waitingFor(Wait.forHttp("/readyz").forPort(MailpitClient.HTTP_PORT));
+    }
+
+    @Bean
+    DynamicPropertyRegistrar mailpitProperties(GenericContainer<?> mailpitContainer) {
+        return registry -> {
+            registry.add("spring.mail.host", mailpitContainer::getHost);
+            registry.add("spring.mail.port", () -> mailpitContainer.getMappedPort(MailpitClient.SMTP_PORT));
+        };
+    }
+
+    @Bean
+    MailpitClient mailpitClient(GenericContainer<?> mailpitContainer) {
+        return new MailpitClient(mailpitContainer);
     }
 
     /** Real Keycloak with the project's realm; the app validates its tokens like in production. */
