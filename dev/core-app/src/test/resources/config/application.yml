@@ -15,6 +15,10 @@ trustledger:
   # No cron triggers in tests: ITs run reconciliation themselves, so a timed run can't interfere.
   scheduling:
     enabled: false
+  # Kafka comes from TestcontainersConfiguration; create the contract topics there like locally.
+  events:
+    topics:
+      create: true
   # WireMock stands in for Razorpay (WireMockConfiguration sets base-url to its random port). Obviously fake
   # test-format keys. Short backoff so retry tests stay fast; the rest keeps the production values.
   razorpay:

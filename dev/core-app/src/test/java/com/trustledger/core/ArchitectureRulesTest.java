@@ -12,6 +12,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import com.trustledger.core.shared.ExternalizedEvent;
 import jakarta.persistence.Entity;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.modulith.events.Externalized;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -168,6 +170,18 @@ class ArchitectureRulesTest {
         noClasses().that().doNotHaveFullyQualifiedName(CORE + ".shared.web.GlobalExceptionHandler")
                 .should().dependOnClassesThat().areAssignableTo(ResponseStatusException.class)
                 .because("errors are TrustLedgerException(ErrorCode), mapped once by GlobalExceptionHandler")
+                .check(production);
+    }
+
+    // M8 (ADR 0005): only the contract leaves core-app. An @Externalized event that isn't an ExternalizedEvent
+    // would not be selected by EventExternalizationConfig, so it would silently never reach Kafka.
+
+    @Test
+    void externalizedEventsMapToAContract() {
+        classes().that().areAnnotatedWith(Externalized.class)
+                .should().implement(ExternalizedEvent.class)
+                .andShould().beRecords()
+                .because("the Kafka payload is the event-contracts record from toV1(), never the internal event")
                 .check(production);
     }
 }

@@ -18,13 +18,31 @@ spring:
       data-source-properties:
         logServerErrorDetail: false
   # Event publication registry = the outbox (ADR 0005). The table is created by Flyway (V16) in the shared schema,
-  # never by Modulith itself. Republishing on restart and cleanup of completed rows come with M8 part B.
+  # never by Modulith itself. On startup, publications left incomplete (crash, Kafka down) are sent again; consumers
+  # de-duplicate on eventId. Completed rows are deleted after trustledger.events.retention (EventPublicationCleanupJob).
   modulith:
     events:
+      republish-outstanding-events-on-restart: true
       jdbc:
         schema: shared
         schema-initialization:
           enabled: false
+  # Kafka producer for the outbox (M8 part B). Modulith's ByteArrayJacksonJsonMessageConverter turns the contract
+  # into JSON bytes with Boot's JsonMapper (its __TypeId__ header names the event-contracts record, never a core-app
+  # class), so the value serializer only passes the bytes on: a JSON serializer here would encode them twice (as a
+  # base64 string). String keys (the wallet ID). acks=all plus idempotence:
+  # no duplicates from producer retries. A send that can't reach Kafka fails within delivery.timeout.ms instead of
+  # hanging; the publication then stays incomplete and is sent again on the next restart. Brokers: per environment.
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 10000
+        request.timeout.ms: 10000
+        delivery.timeout.ms: 30000
   jpa:
     open-in-view: false
     hibernate:
@@ -41,6 +59,11 @@ spring:
 
 server:
   port: 8080
+
+# Kafka clients log their whole configuration at INFO on every start; warnings and errors are enough.
+logging:
+  level:
+    org.apache.kafka: WARN
 
 # Field-encryption and blind-index keys: base64, 32 bytes each, different from each other.
 # Supplied as environment variables (locally via .env). Startup fails if missing or invalid.
@@ -174,6 +197,16 @@ trustledger:
     max-listed-mismatches: 1000
     lock-at-most-for: 30m
     lock-at-least-for: 1m
+  # Outbox (M8, ADR 0005): completed publications are kept 7 days, then deleted nightly at 03:30 (ShedLock
+  # "shared-event-publication-cleanup"). topics.create: NewTopic beans for the contract topics; local and test only.
+  events:
+    retention: 7d
+    cleanup-cron: "0 30 3 * * *"
+    lock-at-most-for: 10m
+    topics:
+      create: false
+      partitions: 3
+      replicas: 1
 
 ---
 # Every profile except local: structured JSON console logs (Elastic Common Schema).

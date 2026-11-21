@@ -84,6 +84,11 @@
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-events-jackson</artifactId>
         </dependency>
+        <!-- Externalizes outbox events to Kafka (ADR 0005 part B). Its version comes from the Modulith BOM. -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-events-kafka</artifactId>
+        </dependency>
         <!-- Rate limiting backed by Redis (Lettuce is already on the classpath via data-redis). -->
         <dependency>
             <groupId>com.bucket4j</groupId>
@@ -204,6 +209,11 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-localstack</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-kafka</artifactId>
             <scope>test</scope>
         </dependency>
         <!-- Razorpay HTTP stubs (ADR 0014). Standalone jar: its Jetty is shaded, so it can't clash with Boot's. -->

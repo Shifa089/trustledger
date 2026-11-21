@@ -58,13 +58,18 @@ class EventPublicationRegistryIT {
                 Money.parse(amount), "Outbox test"));
     }
 
-    /** The registry rows of one transfer's TransferCompleted (the serialized event holds the transfer ID). */
+    /**
+     * The recorder's registry rows of one transfer's TransferCompleted (the serialized event holds the transfer ID).
+     * The Kafka externalizer has its own row per event (EventExternalizationIT), left out here.
+     */
     private List<Map<String, Object>> publicationsOf(UUID transferId) {
         return jdbc.queryForList("""
                 select listener_id, serialized_event, completion_date, status
                 from shared.event_publication
                 where event_type = ? and serialized_event like ?
-                """, TransferCompleted.class.getName(), "%" + transferId + "%");
+                  and listener_id like ?
+                """, TransferCompleted.class.getName(), "%" + transferId + "%",
+                "%" + TransferCompletedRecorder.class.getName() + "%");
     }
 
     private long transferPublicationsFromSender(UUID senderWalletId) {
