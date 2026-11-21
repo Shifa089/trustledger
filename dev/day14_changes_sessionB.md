@@ -8,7 +8,7 @@ first README that explains how to run the project and what the money path does.
 
 Branch: `feature/day14-quality-pass` (created from `master`), merged into `master`.
 
-**No production code changed.** This session only adds docs.
+**Part 1 changed no production code** (docs only). Part 2, at the end of this file, fixes every finding.
 
 ---
 
@@ -114,3 +114,72 @@ risk-aml-service green, `ModularityTests` green. No production or test code chan
 - **Sometimes the spec should change, not the code.** The 404 ownership checks and the hand-written factories
   are deliberate and arguably better than what the SPEC says. Then the fix is to update the document (and an
   ADR), not to make the code match it.
+
+---
+---
+
+## DAY14 Session B, part 2: fixing every finding (M1, M2, L1–L4) + the SPEC wording for I1, I2
+
+Branch: `feature/day14-quality-fixes` (created from `master`).
+
+Decisions:
+1. **L1: change the convention, not the code.** MapStruct is removed from CLAUDE.md and SPEC §6. Mapping is a
+   static `of(...)` factory on the target record (ADR 0016).
+2. **M2: ArchUnit declared directly, with `runtime` scope** (ADR 0015). Spring Modulith already brings it in with
+   runtime scope and needs it at runtime. A `test`-scope declaration would *override* that and take it off the
+   app's classpath.
+3. **L3: `/me` and `/ping` get `authenticated()`, not `hasAnyRole(...)`.** A token with no roles must still be
+   able to call `GET /me`: the first call provisions the user (`SecurityMatrixIT` already pinned this).
+4. **I3 and I4 stay open.** The `test`/`aws` profiles and Kafka belong to M8 and M14, not to a quality pass.
+
+### 1. What changed, per finding
+
+| Finding | Change | Test that proves it |
+|---|---|---|
+| **M1** personal data in DB error logs | `application.yml`: `spring.datasource.hikari.data-source-properties.logServerErrorDetail: false`, so every profile (Testcontainers too) passes it to PgJDBC. The constraint name stays in the message. | **`DatabaseErrorDetailIT`** (new). It inserts a freeze whose reason holds a fake phone number and breaks a CHECK. **Before the fix it failed**, and the message showed `Failing row contains (…, Customer phone 9876543210 said, …)`. After the fix, no cause in the chain contains the value or "Failing row", and the constraint name is still there. |
+| **M2** no ArchUnit rules | `core-app/pom.xml`: `com.tngtech.archunit:archunit:1.4.2` (runtime). New **`ArchitectureRulesTest`**, 12 rules: domain/application/web layering; controllers only in `web`; `@Transactional` only in `application`; no `jakarta.transaction.Transactional`; no `*.now()`, `currentTimeMillis` or `Clock.system*` outside `ClockConfig`; no `double`/`float` fields outside `*Properties`; `*Request`/`*Response` in `web` are records; entities only in `domain`; entities have no public setters; no `ResponseStatusException` outside `GlobalExceptionHandler`. ADR 0015. | All 12 green on the current code. A planted class (an `@Transactional` method calling `Instant.now()` in `web`) failed **exactly the 2 matching rules**, and was then deleted. |
+| **L1** MapStruct convention | CLAUDE.md stack and conventions, SPEC §6 "DTOs and mapping" and the SPEC §7 copy of CLAUDE.md updated; **ADR 0016**. | `requestAndResponseTypesAreRecords` (ArchUnit). |
+| **L2** hard-coded limits | New `shared/paging/PagingProperties` (`trustledger.paging.default-size: 20`, `max-size: 100`, max-size capped at 1,000, startup fails on bad values) with `checkedSize(page, size)`. `KycReviewService` and `HeldTransferService` use it; their `MAX_PAGE_SIZE` constants are gone. The two controllers take `Integer size` (optional) instead of `@Max(constant)`. `IdempotencyService.MAX_CLAIM_ATTEMPTS` → `trustledger.payments.idempotency.claim-attempts: 3` (1–10). | `PagingPropertiesTest` (6, new): default, bounds, VALIDATION_FAILED, fail-fast config, binding. `PaymentsPropertiesTest` (+1): claim-attempts bounds. `ComplianceKycIT` / `ComplianceTransferControllerIT`: size 0 / 101 → 400, unchanged. |
+| **L3** no explicit rule for `/ping`; open catch-all | `SecurityConfig`: `GET /api/*/me` and `/api/*/ping` → `authenticated()` (explicit); **the catch-all `/api/** authenticated()` is gone, so the chain ends in `denyAll()`**. Test-only probes under `/api/*/test/**` get their own test-only chain (`TestProbeSecurityConfig`, src/test). | `SecurityMatrixIT` (155, +4): `/customer/probe` (no rule) is now **403 for every role**, `/ping` rows added, the method-security probe moved to `/test/method-secured`. `ApiVersioningIT`: an unknown `/api/v1/...` path is now **403 `ACCESS_DENIED`** instead of 404 (refused before routing; callers can't map which paths exist). |
+| **L4** v4 webhook IDs | New `shared/Ids.newV7(Clock)`: RFC 9562 UUIDv7 from the injected clock + `SecureRandom`. `WebhookService` uses it for all three inserts. | `IdsTest` (5, new): version 7 and the RFC variant, the first 48 bits equal the clock's millis (checked against a hex string as well), sorted across milliseconds, 10,000 unique within one millisecond, out-of-range times refused. `WebhookServiceTest`: stored IDs are v7 with the clock's millis. |
+| **I1** `@Version` | SPEC §6 "Concurrency" now says where `@Version` isn't needed and why. | — |
+| **I2** ownership wording | SPEC §6 "Security" now describes what the code does: the service checks the caller, and another user's resource gets the same 404. | Existing BOLA ITs. |
+
+README: `ArchitectureRulesTest` mentioned next to `ModularityTests`, ArchUnit in the stack, ADRs 0015 and 0016 in
+the table.
+
+### 2. Behaviour changes to know about
+
+- **Unknown `/api/**` paths: 404 → 403.** Every new endpoint now needs its role rule in `SecurityConfig` (CLAUDE.md
+  Security rules says so), or it's refused, even for a valid token.
+- **Review queue `size` above the maximum:** still 400 `VALIDATION_FAILED`, but now produced by the service, so
+  the body has a `detail` ("page must be >= 0 and size 1-100.") instead of a `violations` list.
+- **Constraint-violation log lines** no longer include `Detail: Failing row contains (...)`. Use the constraint
+  name and the correlation ID to debug.
+
+### 3. How to verify part 2
+
+| # | Command | Why |
+|---|---|---|
+| 1 | `./mvnw clean verify` | Everything green, including the new rules. |
+| 2 | `./mvnw -pl core-app test "-Dtest=ArchitectureRulesTest,IdsTest,PagingPropertiesTest,PaymentsPropertiesTest,WebhookServiceTest"` | The new rules and units. No Docker. |
+| 3 | `./mvnw -pl core-app verify -DskipUnitTests "-Dit.test=DatabaseErrorDetailIT,SecurityMatrixIT,ApiVersioningIT,IdempotencyInterceptorIT"` | Log redaction, fail-closed security, test probes still reachable. |
+| 4 | Plant a violation (e.g. `Instant.now()` in any main class) and run row 2 | See an ArchUnit failure with file and line, then remove it. |
+
+### 4. Results (part 2)
+
+`./mvnw clean verify -fae` ended in **BUILD SUCCESS** (5 min 40 s): core-app **1,017 unit tests** (+24) and
+**595 integration tests** (+5), risk-aml-service green, `ModularityTests` and **`ArchitectureRulesTest`** green.
+
+### What to learn from part 2
+
+- **Write the failing test before the fix, even for configuration.** `DatabaseErrorDetailIT` failed first and
+  showed the fake phone number in the message. That proves both that the leak was real and that the one-line fix
+  closes it.
+- **Test your tests.** An ArchUnit rule that never fails is worth nothing. Planting a violation and watching
+  exactly the right rules go red is cheap proof the guard works.
+- **A dependency's scope is part of the decision.** Declaring ArchUnit "for tests" in the obvious way (`test`
+  scope) would have quietly removed it from Modulith's runtime classpath. Maven's "nearest declaration wins"
+  applies to scope too.
+- **Fail closed changes error codes.** `denyAll()` turned "unknown path" from 404 into 403. That's a reasonable
+  trade (and it hides which paths exist), but it's a visible API change, so a test now states it on purpose.
