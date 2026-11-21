@@ -22,6 +22,16 @@ public interface IdentityApi {
      */
     Optional<UserView> findByPhone(String phone);
 
+    /** A user by our ID, with masked display values only (e.g. a transfer counterparty in a notification). */
+    Optional<UserView> findUser(UUID userId);
+
+    /**
+     * Where to e-mail the user (FR-N-1). The <b>only</b> way a plaintext e-mail address leaves this module, and it
+     * exists for addressing a notification: callers must not log or store it. Empty for an unknown or erased user
+     * and for a user without an e-mail address.
+     */
+    Optional<NotificationContact> findNotificationContact(UUID userId);
+
     /**
      * Stores the mobile number verified by minimum KYC (FR-KYC-1) on the user, encrypted, with its blind
      * index. Joins the caller's transaction, so a later failure in the KYC step rolls this back too.

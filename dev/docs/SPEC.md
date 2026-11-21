@@ -121,7 +121,7 @@ TrustLedger is a prepaid digital wallet: customers complete KYC, add money throu
 - FR-A-2: Auditors can verify the hash chain through an API endpoint.
 - FR-PR-1: Personal data (PAN, date of birth, address, mobile, email) is encrypted at rest and masked in responses (for example `XXXXX1234X`).
 - FR-PR-2: Users can request a data export (JSON) and erasure. Erasure anonymises personal fields but keeps ledger, transfer and audit records for the retention period.
-- FR-N-1: Email notifications for transfer sent/received, KYC decision and wallet frozen.
+- FR-N-1: Email notifications for transfer sent/received, top-up captured, KYC approved and wallet frozen. Plain text with masked details (amount, masked counterparty name, last 4 characters of IDs); the frozen-wallet mail never gives the reason or the source (no tipping off). Sent after commit by `@ApplicationModuleListener`s; every attempt is recorded in `notification.notifications` (SENT/FAILED/SKIPPED, de-duplicated per event and recipient), and a mail failure never rolls back the business change (ADR 0017).
 - FR-S-1: Transaction history with pagination, sorting and filters (date range, type). FR-S-2: Monthly statement as a PDF.
 
 **Wallet limits (configurable in `application.yml`)**

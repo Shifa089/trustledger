@@ -68,9 +68,9 @@ class KafkaRepublishOnRestartIT {
     private Map<String, Object> kafkaPublicationOf(UUID transferId) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 select status, completion_date from shared.event_publication
-                where event_type = ? and serialized_event like ? and listener_id not like ?
+                where event_type = ? and serialized_event like ? and listener_id not like ? and listener_id not like ?
                 """, TransferCompleted.class.getName(), "%" + transferId + "%",
-                "%" + TransferCompletedRecorder.class.getName() + "%");
+                "%" + TransferCompletedRecorder.class.getName() + "%", "%.notification.%");
         assertThat(rows).hasSize(1);
         return rows.getFirst();
     }

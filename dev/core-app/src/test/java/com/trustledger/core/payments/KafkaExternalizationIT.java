@@ -94,8 +94,9 @@ class KafkaExternalizationIT {
     private List<Instant> kafkaPublicationCompletions(Class<?> eventType, UUID id) {
         return jdbc.queryForList("""
                 select completion_date from shared.event_publication
-                where event_type = ? and serialized_event like ? and listener_id not like ?
-                """, eventType.getName(), "%" + id + "%", "%" + TransferCompletedRecorder.class.getName() + "%")
+                where event_type = ? and serialized_event like ? and listener_id not like ? and listener_id not like ?
+                """, eventType.getName(), "%" + id + "%", "%" + TransferCompletedRecorder.class.getName() + "%",
+                "%.notification.%")
                 .stream().map(row -> row.get("completion_date") == null ? null
                         : ((java.sql.Timestamp) row.get("completion_date")).toInstant())
                 .toList();

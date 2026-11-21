@@ -35,3 +35,12 @@ trustledger:
       bucket: trustledger-kyc-test
       path-style: true
       create-bucket: true
+
+# Mailpit comes from TestcontainersConfiguration (host and port). Short SMTP timeouts, so the "mail server down"
+# test (Mailpit paused) fails its send in seconds.
+spring:
+  mail:
+    properties:
+      mail.smtp.connectiontimeout: 2000
+      mail.smtp.timeout: 2000
+      mail.smtp.writetimeout: 2000
