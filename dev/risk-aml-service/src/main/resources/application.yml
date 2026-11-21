@@ -4,12 +4,67 @@ spring:
   threads:
     virtual:
       enabled: true
+  # Own schema "aml" (SPEC §4), own migrations and own history table (aml.flyway_schema_history), so this service
+  # and core-app can share one PostgreSQL locally without touching each other's tables (ADR 0007).
+  flyway:
+    schemas: aml
+    default-schema: aml
+    create-schemas: true
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
     properties:
       hibernate.jdbc.time_zone: UTC
+      hibernate.default_schema: aml
+  # Consumers (M9). Records are JSON written by core-app's outbox; the __TypeId__ header names the contract record.
+  # ErrorHandlingDeserializer wraps the JSON one, so a record that can't be read becomes a DeserializationException
+  # for the error handler (straight to <topic>.DLT) instead of failing the poll loop forever. Only classes in the
+  # event-contracts package may be built from a message. Offsets are committed after the listener returns, i.e.
+  # after the database transaction: a crash in between redelivers, and processed_events skips the repeat.
+  kafka:
+    consumer:
+      group-id: risk-aml-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.trusted.packages: com.trustledger.events
+        spring.json.use.type.headers: true
+    # Dead-letter producer (KafkaConsumerConfig builds its serializers): no duplicates from producer retries.
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 10000
+        request.timeout.ms: 10000
+        delivery.timeout.ms: 30000
+  # Same Keycloak realm and audience as core-app; issuer-uri per environment.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          audiences: trustledger-api
 
 server:
   port: 8081
+
+logging:
+  level:
+    org.apache.kafka: WARN
+
+trustledger:
+  aml:
+    kafka:
+      # 3 attempts in total (1 try + 2 retries) with 1 s, then 2 s between them; then <topic>.DLT.
+      retry:
+        max-attempts: 3
+        initial-interval: 1s
+        multiplier: 2.0
+        max-interval: 10s
+      # Topic creation is for local and test only (their profiles set create: true); same layout as core-app's.
+      topics:
+        create: false
+        partitions: 3
+        replicas: 1

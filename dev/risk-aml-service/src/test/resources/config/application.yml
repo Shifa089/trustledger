@@ -1,0 +1,19 @@
+# Test-only overrides, merged on top of src/main/resources/application.yml.
+spring:
+  # Never contacted: the decoder fetches keys only for a real bearer token, and the security tests use MockMvc's
+  # jwt() tokens. A real Keycloak is covered by core-app's KeycloakRealmIT (same realm, same checks).
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://issuer.invalid/realms/trustledger
+trustledger:
+  aml:
+    kafka:
+      # Same 3 attempts, short waits so retry tests stay fast.
+      retry:
+        initial-interval: 50ms
+        multiplier: 2.0
+        max-interval: 200ms
+      topics:
+        create: true
