@@ -43,6 +43,19 @@ class CheckoutPageLocalTest {
                 .andExpect(content().string(containsString("Idempotency-Key")));
     }
 
+    /** Day 14: paying a top-up created elsewhere (http/topups.http), used by docs/e2e-razorpay.md. */
+    @Test
+    void pageCanPayAnExistingPendingTopup() throws Exception {
+        mvc.perform(get("/checkout.html")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"existing\"")))
+                .andExpect(content().string(containsString("id=\"payExisting\"")));
+        mvc.perform(get("/checkout.js")).andExpect(status().isOk())
+                // The ID is checked as a UUID before it goes into the URL path, and only PENDING is reopened.
+                .andExpect(content().string(containsString("UUID_PATTERN.test(id)")))
+                .andExpect(content().string(containsString("topup.status !== 'PENDING'")))
+                .andExpect(content().string(containsString("onClick('payExisting', payExisting)")));
+    }
+
     @Test
     void pageAllowsRazorpayButNoInlineScript() throws Exception {
         mvc.perform(get("/checkout.html"))
