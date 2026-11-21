@@ -47,3 +47,16 @@ Rules that stay:
 - A big DTO means more lines of plain field copying. If a future module (for example reporting, M11) needs many
   large, purely structural mappings, revisit this with an ADR.
 - Mapping factories are tested where they matter: masking and money formatting, in the controller and view tests.
+
+## Addendum (2026-11-21, M8): Kafka contracts are mapped on the source record
+
+The Kafka contracts (`TransferCompletedV1`, ...) live in the `event-contracts` jar, which both applications share
+and which has no dependency on core-app. A static `of(TransferCompleted)` on the contract would make that jar
+depend on core-app's internal types, so the rule "factory on the target" can't apply there.
+
+For these contracts only, the mapping is an instance method on the **source** event record in the owning module's
+public API: `TransferCompleted.toV1()`, `TopupCaptured.toV1()`, `WalletFrozen.toV1()`. It stays plain Java next to
+one of the two types, is checked by the compiler, keeps each module in charge of what it exposes (for example
+`WalletFrozen.toV1()` drops the user ID), and can be called from the externalization configuration (M8 part B)
+without reaching into a module's internal packages. The methods are pure, so a resubmitted event maps to the same
+contract (ADR 0005).

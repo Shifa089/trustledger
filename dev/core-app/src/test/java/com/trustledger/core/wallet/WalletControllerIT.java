@@ -157,8 +157,13 @@ class WalletControllerIT {
                 walletId);
         assertThat(row).containsEntry("source", "COMPLIANCE").containsEntry("reason", "Bank reported fraud")
                 .containsEntry("frozen_by", officerId).containsEntry("unfrozen_at", null);
-        assertThat(events.stream(WalletFrozen.class))
-                .containsExactly(new WalletFrozen(walletId, userId, FreezeSource.COMPLIANCE));
+        assertThat(events.stream(WalletFrozen.class)).singleElement().satisfies(frozen -> {
+            assertThat(frozen.walletId()).isEqualTo(walletId);
+            assertThat(frozen.userId()).isEqualTo(userId);
+            assertThat(frozen.source()).isEqualTo(FreezeSource.COMPLIANCE);
+            assertThat(frozen.frozenAt()).isNotNull();
+            assertThat(frozen.metadata().eventId()).isNotNull();
+        });
         me(customerSubject).andExpect(jsonPath("$.status").value("FROZEN"));
     }
 

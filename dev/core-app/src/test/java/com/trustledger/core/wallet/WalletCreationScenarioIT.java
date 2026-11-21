@@ -1,5 +1,6 @@
 package com.trustledger.core.wallet;
 
+import static com.trustledger.core.Eventually.eventually;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.trustledger.core.TestcontainersConfiguration;
@@ -28,8 +29,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.modulith.test.EnableScenarios;
 import org.springframework.modulith.test.Scenario;
-import org.springframework.test.context.event.ApplicationEvents;
-import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -39,7 +38,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 @EnableScenarios
-@RecordApplicationEvents
 class WalletCreationScenarioIT {
 
     /** Fake documents with the right magic bytes; never real documents. */
@@ -117,12 +115,17 @@ class WalletCreationScenarioIT {
     @Test
     void linkingAgainKeepsOneLedgerAccount() {
         UUID walletId = fixtures.wallet(WalletTier.MIN);
-        UUID linked = jdbc.queryForObject("select ledger_account_id from wallet.wallets where id = ?", UUID.class,
-                walletId);
+        // The WalletCreated listener links the account asynchronously (M8): wait for the first link.
+        eventually(() -> assertThat(ledgerAccountOfWallet(walletId)).isNotNull());
+        UUID linked = ledgerAccountOfWallet(walletId);
 
         assertThat(links.link(walletId)).isEqualTo(linked).isNotNull();
         assertThat(jdbc.queryForObject("select count(*) from ledger.ledger_accounts where code = ?", Integer.class,
                 AccountCodes.wallet(walletId))).isEqualTo(1);
+    }
+
+    private UUID ledgerAccountOfWallet(UUID walletId) {
+        return jdbc.queryForObject("select ledger_account_id from wallet.wallets where id = ?", UUID.class, walletId);
     }
 
     private UUID ledgerAccountOf(UUID userId) {
@@ -131,23 +134,29 @@ class WalletCreationScenarioIT {
     }
 
     @Test
-    void theSameEventTwiceLeavesOneWalletAndOneWalletCreated(ApplicationEvents events) {
+    void theSameEventTwiceLeavesOneWalletAndOneWalletCreated() {
         UUID userId = fixtures.user();
 
-        publishCommitted(new KycLevelUpgraded(userId, KycLevel.MIN));
+        publishCommittedAndWait(new KycLevelUpgraded(userId, KycLevel.MIN));
         UUID first = wallets.findByUser(userId).orElseThrow().walletId();
-        publishCommitted(new KycLevelUpgraded(userId, KycLevel.MIN));
+        publishCommittedAndWait(new KycLevelUpgraded(userId, KycLevel.MIN));
 
         assertThat(wallets.findByUser(userId).orElseThrow().walletId()).isEqualTo(first);
         assertThat(jdbc.queryForObject("select count(*) from wallet.wallets where user_id = ?", Integer.class, userId))
                 .isEqualTo(1);
-        assertThat(events.stream(WalletCreated.class).filter(e -> e.userId().equals(userId))).hasSize(1);
+        // WalletCreated is published on the listener's thread now (M8), which ApplicationEvents (thread-bound) doesn't
+        // see. The outbox does: one WalletCreated publication per listener of it, i.e. it was published once.
+        assertThat(jdbc.queryForObject("""
+                select count(distinct serialized_event) from shared.event_publication
+                where event_type = ? and serialized_event like ?
+                """, Integer.class, WalletCreated.class.getName(), "%" + userId + "%")).isEqualTo(1);
     }
 
     @Test
     void fullKycApprovalUpgradesTheWalletKeepingItsId(Scenario scenario) {
         UUID userId = fixtures.user();
         minKyc.submit(minCommand(userId));
+        awaitListenersFor(userId);
         UUID walletId = wallets.findByUser(userId).orElseThrow().walletId();
         UUID caseId = fullKyc.submit(userId, "12 Wallet Street, Pune").id();
         documents.upload(userId, caseId, DocumentType.PAN_CARD, PNG);
@@ -166,9 +175,9 @@ class WalletCreationScenarioIT {
     @Test
     void lateMinEventNeverDowngradesAFullWallet() {
         UUID userId = fixtures.user();
-        publishCommitted(new KycLevelUpgraded(userId, KycLevel.FULL));
+        publishCommittedAndWait(new KycLevelUpgraded(userId, KycLevel.FULL));
 
-        publishCommitted(new KycLevelUpgraded(userId, KycLevel.MIN));
+        publishCommittedAndWait(new KycLevelUpgraded(userId, KycLevel.MIN));
 
         assertThat(wallets.findByUser(userId).orElseThrow().tier()).isEqualTo(WalletTier.FULL);
     }
@@ -182,12 +191,33 @@ class WalletCreationScenarioIT {
             status.setRollbackOnly();
         });
 
+        // Listeners are asynchronous (M8), so "no wallet yet" alone proves little; the outbox proves it: the
+        // rolled-back event left no publication, so no listener will ever run for it.
+        assertThat(publicationsFor(userId)).isZero();
         assertThat(wallets.findByUser(userId)).isEmpty();
     }
 
     /** {@code @ApplicationModuleListener} only reacts after a commit, as in production. */
-    private void publishCommitted(KycLevelUpgraded event) {
+    private void publishCommittedAndWait(KycLevelUpgraded event) {
         tx.executeWithoutResult(status -> publisher.publishEvent(event));
+        awaitListenersFor(event.userId());
+    }
+
+    /**
+     * Since M8 module listeners run asynchronously after the commit. Waits until every publication that mentions the
+     * user (KycLevelUpgraded, then the WalletCreated it causes) is completed. The chain can't look finished early:
+     * the WalletCreated row is committed before KycLevelUpgraded is marked completed.
+     */
+    private void awaitListenersFor(UUID userId) {
+        eventually(() -> assertThat(jdbc.queryForObject("""
+                select count(*) from shared.event_publication
+                where completion_date is null and serialized_event like ?
+                """, Integer.class, "%" + userId + "%")).isZero());
+    }
+
+    private int publicationsFor(UUID userId) {
+        return jdbc.queryForObject("select count(*) from shared.event_publication where serialized_event like ?",
+                Integer.class, "%" + userId + "%");
     }
 
     private static MinKycCommand minCommand(UUID userId) {

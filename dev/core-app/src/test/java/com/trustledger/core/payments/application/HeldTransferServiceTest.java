@@ -17,6 +17,7 @@ import com.trustledger.core.payments.TransferCompleted;
 import com.trustledger.core.payments.domain.Transfer;
 import com.trustledger.core.payments.domain.TransferRepository;
 import com.trustledger.core.payments.domain.TransferStatus;
+import com.trustledger.core.shared.EventMetadata;
 import com.trustledger.core.shared.paging.PagingProperties;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.Money;
@@ -35,6 +36,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -54,6 +56,8 @@ class HeldTransferServiceTest {
 
     private static final Instant CREATED = Instant.parse("2026-11-19T05:00:00Z");
     private static final Instant NOW = Instant.parse("2026-11-19T06:30:00Z");
+    // Placeholder: comparisons ignore metadata (its eventId is random); tests assert it is present separately.
+    private static final EventMetadata ANY_METADATA = new EventMetadata(UUID.randomUUID(), null);
     private static final UUID SENDER = UUID.randomUUID();
     private static final UUID RECEIVER = UUID.randomUUID();
     private static final UUID TRANSFER_ID = UUID.randomUUID();
@@ -118,8 +122,11 @@ class HeldTransferServiceTest {
         order.verify(wallets).releaseHold(SENDER, AMOUNT);
         order.verify(wallets).debit(SENDER, AMOUNT);
         order.verify(wallets).credit(RECEIVER, AMOUNT);
-        order.verify(events).publishEvent(new TransferCompleted(TRANSFER_ID, SENDER, RECEIVER, AMOUNT, ENTRY_ID,
-                NOW));
+        ArgumentCaptor<TransferCompleted> published = ArgumentCaptor.forClass(TransferCompleted.class);
+        order.verify(events).publishEvent(published.capture());
+        assertThat(published.getValue()).usingRecursiveComparison().ignoringFields("metadata")
+                .isEqualTo(new TransferCompleted(TRANSFER_ID, SENDER, RECEIVER, AMOUNT, ENTRY_ID, NOW, ANY_METADATA));
+        assertThat(published.getValue().metadata().eventId()).isNotNull();
         assertThat(result.status()).isEqualTo(TransferStatus.COMPLETED);
         assertThat(result.reviewedBy()).isEqualTo(OFFICER);
         assertThat(result.reviewedAt()).isEqualTo(NOW);

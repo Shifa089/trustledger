@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.trustledger.core.shared.ErrorCode;
+import com.trustledger.core.shared.EventMetadata;
 import com.trustledger.core.shared.TrustLedgerException;
 import com.trustledger.core.wallet.FreezeSource;
 import com.trustledger.core.wallet.WalletFrozen;
@@ -24,6 +25,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -33,6 +35,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 class WalletComplianceServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-11-15T10:00:00Z");
+    // Placeholder: comparisons ignore metadata (its eventId is random); tests assert it is present separately.
+    private static final EventMetadata ANY_METADATA = new EventMetadata(UUID.randomUUID(), null);
     private static final UUID OFFICER = UUID.randomUUID();
 
     @Mock
@@ -63,7 +67,12 @@ class WalletComplianceServiceTest {
         assertThat(view.currentFreeze().frozenAt()).isEqualTo(NOW);
         assertThat(view.currentFreeze().toString()).doesNotContain("Fraud report");
         verify(wallets).saveAndFlush(wallet);
-        verify(events).publishEvent(new WalletFrozen(wallet.getId(), wallet.getUserId(), FreezeSource.COMPLIANCE));
+        ArgumentCaptor<WalletFrozen> published = ArgumentCaptor.forClass(WalletFrozen.class);
+        verify(events).publishEvent(published.capture());
+        assertThat(published.getValue()).usingRecursiveComparison().ignoringFields("metadata")
+                .isEqualTo(new WalletFrozen(wallet.getId(), wallet.getUserId(), FreezeSource.COMPLIANCE, NOW,
+                        ANY_METADATA));
+        assertThat(published.getValue().metadata().eventId()).isNotNull();
     }
 
     @Test

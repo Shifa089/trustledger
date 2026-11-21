@@ -219,7 +219,7 @@ Spring Modulith treats a module's base package as its public API and its sub-pac
 
 ## 4. Domain model and database schema
 
-One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`, `ledger`, `payments`, `audit`, `privacy`, `notification`) plus `shared` (only the ShedLock table, ADR 0013) and a separate `aml` schema owned by the AML service. Money is stored as `bigint` paise, IDs are UUIDs, and timestamps are `timestamptz` in UTC.
+One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`, `ledger`, `payments`, `audit`, `privacy`, `notification`) plus `shared` (the ShedLock table, ADR 0013, and the `event_publication` outbox, ADR 0005) and a separate `aml` schema owned by the AML service. Money is stored as `bigint` paise, IDs are UUIDs, and timestamps are `timestamptz` in UTC.
 
 **Core tables** (every table also has `created_at`; mutable tables have `updated_at` and `version` for optimistic locking)
 
@@ -241,7 +241,7 @@ One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`,
 | `payments.idempotency_keys` | `user_id`, `idem_key`, `request_hash`, `status` (IN\_PROGRESS, COMPLETED), `response_status`, `response_body` (jsonb), `expires_at` | Primary key (`user_id`, `idem_key`); kept 24 hours; index on `expires_at` for the hourly cleanup job; a response is stored only for 2xx, any other outcome deletes the key |
 | `audit.audit_events` | `seq` (bigserial), `occurred_at`, `actor_id`, `actor_role`, `action`, `entity_type`, `entity_id`, `before`/`after` (jsonb, masked), `ip`, `correlation_id`, `prev_hash`, `hash` | Append-only; `hash` = SHA-256 of `prev_hash` + the event's canonical JSON |
 | `privacy.data_requests` | `id`, `user_id`, `type` (EXPORT, ERASURE), `status`, `result_s3_key` | - |
-| `event_publication` | Created by Spring Modulith | The outbox: events stored in the same transaction, then sent to Kafka |
+| `shared.event_publication` | Spring Modulith's registry layout: `id`, `listener_id`, `event_type`, `serialized_event`, `publication_date`, `completion_date`, `status`, `completion_attempts`, `last_resubmission_date` | The outbox (ADR 0005): events stored in the same transaction, then sent to Kafka. Created by Flyway (V16), not by Modulith's schema initialisation |
 | `aml.transaction_facts` | `event_id`, `wallet_id`, `counterparty_wallet_id`, `amount_minor`, `direction`, `occurred_at` | `event_id` unique; index on (`wallet_id`, `occurred_at`) for rule windows |
 | `aml.alerts`, `aml.cases` | Alert: `rule_code`, `severity`, `details`, `case_id`. Case: `wallet_id`, `status`, `assigned_to`, `resolution`, `ai_summary` | One open case per wallet |
 | `aml.processed_events` | `event_id` (primary key) | Idempotent consumer: skip events already processed |

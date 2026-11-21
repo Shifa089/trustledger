@@ -40,3 +40,8 @@ Option 1. `spring-modulith-events-api`, no explicit version (managed by the exis
   (`spring-modulith-starter-jpa`) so incomplete events are stored and retried; that will need its own entry
   but not a new ADR, since it is the same project and BOM.
 - Every future cross-module listener (ledger, notification, audit) uses the same annotation.
+
+**Update (2026-11-21, M8, ADR 0005):** the registry came as `spring-modulith-events-jdbc` (plus
+`spring-modulith-events-jackson`), not `starter-jpa`. With it Spring Modulith enables `@EnableAsync`, so listeners now
+run asynchronously after the commit, and a failed listener leaves an incomplete publication instead of losing the
+event.

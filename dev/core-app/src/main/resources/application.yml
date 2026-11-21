@@ -17,6 +17,14 @@ spring:
     hikari:
       data-source-properties:
         logServerErrorDetail: false
+  # Event publication registry = the outbox (ADR 0005). The table is created by Flyway (V16) in the shared schema,
+  # never by Modulith itself. Republishing on restart and cleanup of completed rows come with M8 part B.
+  modulith:
+    events:
+      jdbc:
+        schema: shared
+        schema-initialization:
+          enabled: false
   jpa:
     open-in-view: false
     hibernate:

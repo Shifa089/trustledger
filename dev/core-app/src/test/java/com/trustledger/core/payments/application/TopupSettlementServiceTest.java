@@ -21,6 +21,7 @@ import com.trustledger.core.payments.domain.GatewayPaymentStatus;
 import com.trustledger.core.payments.domain.Topup;
 import com.trustledger.core.payments.domain.TopupRepository;
 import com.trustledger.core.payments.domain.TopupStatus;
+import com.trustledger.core.shared.EventMetadata;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.wallet.WalletApi;
 import com.trustledger.core.wallet.WalletLimits;
@@ -43,6 +44,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 class TopupSettlementServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-11-20T10:00:00Z");
+    // Placeholder: comparisons ignore metadata (its eventId is random); tests assert it is present separately.
+    private static final EventMetadata ANY_METADATA = new EventMetadata(UUID.randomUUID(), null);
     private static final UUID WALLET = UUID.randomUUID();
     private static final UUID TOPUP = UUID.randomUUID();
     private static final UUID ENTRY = UUID.randomUUID();
@@ -119,7 +122,11 @@ class TopupSettlementServiceTest {
         assertThat(topup.getGatewayPaymentId()).isEqualTo(PAYMENT);
         assertThat(topup.getJournalEntryId()).isEqualTo(ENTRY);
         verify(topups).saveAndFlush(topup);
-        verify(events).publishEvent(new TopupCaptured(TOPUP, WALLET, AMOUNT, ENTRY, NOW));
+        ArgumentCaptor<TopupCaptured> published = ArgumentCaptor.forClass(TopupCaptured.class);
+        verify(events).publishEvent(published.capture());
+        assertThat(published.getValue()).usingRecursiveComparison().ignoringFields("metadata")
+                .isEqualTo(new TopupCaptured(TOPUP, WALLET, AMOUNT, ENTRY, NOW, ANY_METADATA));
+        assertThat(published.getValue().metadata().eventId()).isNotNull();
     }
 
     @Test

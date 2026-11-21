@@ -68,11 +68,21 @@
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-starter-core</artifactId>
         </dependency>
-        <!-- @ApplicationModuleListener (M4: wallet reacts to KycLevelUpgraded). Annotations only; the event
-             publication registry (outbox, spring-modulith-starter-jpa) follows in M8. -->
+        <!-- @ApplicationModuleListener (M4: wallet reacts to KycLevelUpgraded). Annotations only (ADR 0012). -->
         <dependency>
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-events-api</artifactId>
+        </dependency>
+        <!-- Event publication registry = the outbox (M8, ADR 0005): publications stored in shared.event_publication
+             (Flyway V16) in the publishing transaction. events-jackson provides the EventSerializer the JDBC
+             registry needs to store events as JSON. Both versions come from the Spring Modulith BOM. -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-events-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-events-jackson</artifactId>
         </dependency>
         <!-- Rate limiting backed by Redis (Lettuce is already on the classpath via data-redis). -->
         <dependency>
