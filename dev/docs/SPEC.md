@@ -242,9 +242,9 @@ One PostgreSQL database with one schema per module (`identity`, `kyc`, `wallet`,
 | `audit.audit_events` | `seq` (bigserial), `occurred_at`, `actor_id`, `actor_role`, `action`, `entity_type`, `entity_id`, `before`/`after` (jsonb, masked), `ip`, `correlation_id`, `prev_hash`, `hash` | Append-only; `hash` = SHA-256 of `prev_hash` + the event's canonical JSON |
 | `privacy.data_requests` | `id`, `user_id`, `type` (EXPORT, ERASURE), `status`, `result_s3_key` | - |
 | `shared.event_publication` | Spring Modulith's registry layout: `id`, `listener_id`, `event_type`, `serialized_event`, `publication_date`, `completion_date`, `status`, `completion_attempts`, `last_resubmission_date` | The outbox (ADR 0005): events stored in the same transaction, then sent to Kafka. Created by Flyway (V16), not by Modulith's schema initialisation |
-| `aml.transaction_facts` | `event_id`, `wallet_id`, `counterparty_wallet_id`, `amount_minor`, `direction`, `occurred_at` | `event_id` unique; index on (`wallet_id`, `occurred_at`) for rule windows |
-| `aml.alerts`, `aml.cases` | Alert: `rule_code`, `severity`, `details`, `case_id`. Case: `wallet_id`, `status`, `assigned_to`, `resolution`, `ai_summary` | One open case per wallet |
-| `aml.processed_events` | `event_id` (primary key) | Idempotent consumer: skip events already processed |
+| `aml.transaction_facts` | `id`, `event_id`, `wallet_id`, `counterparty_wallet_id`, `direction` (OUT, IN), `source` (TRANSFER, TOPUP), `reference_id` (transfer or top-up ID), `amount_minor`, `currency`, `occurred_at` | (`event_id`, `direction`) unique: a transfer gives an OUT fact for the sender and an IN fact for the receiver; a top-up is IN without counterparty; append-only (trigger); index on (`wallet_id`, `occurred_at`) for rule windows |
+| `aml.alerts`, `aml.cases` | Alert: `rule_code`, `severity`, `details`, `case_id`. Case: `wallet_id`, `status`, `assigned_to`, `resolution`, `ai_summary` | One open case per wallet (partial unique index on `wallet_id` while OPEN or INVESTIGATING); `resolution` set iff CLOSED\_FALSE\_POSITIVE or ESCALATED; an alert references its case (same schema) |
+| `aml.processed_events` | `event_id` (primary key), `topic`, `processed_at` | Idempotent consumer: inserted with `ON CONFLICT DO NOTHING` in the same transaction as the facts; an event already present is skipped (ADR 0007) |
 
 **Database-level safety nets (Flyway migrations)**
 
@@ -379,7 +379,7 @@ These conventions apply to every milestone; they also go into CLAUDE.md so Claud
 | Configuration | `@ConfigurationProperties` records with validation (`trustledger.limits.*`, `trustledger.aml.*`, `trustledger.razorpay.*`). Profiles: `local`, `test`, `aws`. Secrets only from environment variables or AWS Secrets Manager. |
 | Database | Flyway migrations named `V{n}__{module}_{description}.sql`; `ddl-auto=validate`; `open-in-view=false`. |
 | Events | In-process: records published with `ApplicationEventPublisher` and handled by `@ApplicationModuleListener`. To Kafka: the internal event carries `@Externalized(TransferCompletedV1.TOPIC + "::#{#this.senderWalletId()}")` (topic from the contract, the wallet ID as message key) and implements `ExternalizedEvent`; one `EventExternalizationConfiguration` sends its `toV1()` contract, never the internal event (ADR 0005). |
-| Kafka | Topic names `trustledger.<module>.<event>.v<n>`; JSON payloads; headers carry `eventId` and `correlationId`; consumers are idempotent and use a dead-letter topic after 3 retries. |
+| Kafka | Topic names `trustledger.<module>.<event>.v<n>`; JSON payloads; headers carry `eventId` and `correlationId`; consumers are idempotent and send a record to `<topic>.DLT` after 3 attempts with exponential backoff; a record that can't be deserialised goes there at once (ADR 0007). |
 | Performance | Virtual threads on (`spring.threads.virtual.enabled=true`). |
 | Git | Conventional Commits (`feat(payments): ...`), one branch and PR per milestone. |
 

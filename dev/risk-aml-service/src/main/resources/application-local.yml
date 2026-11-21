@@ -10,3 +10,20 @@ spring:
     url: jdbc:postgresql://localhost:5432/${POSTGRES_DB}
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${TRUSTLEDGER_ISSUER_URI:http://localhost:8180/realms/trustledger}
+  # Kafka from infra/docker-compose.yml.
+  kafka:
+    bootstrap-servers: localhost:9092
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "
+trustledger:
+  aml:
+    kafka:
+      # The compose broker doesn't auto-create topics.
+      topics:
+        create: true
