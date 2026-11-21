@@ -34,15 +34,19 @@ public record PaymentsProperties(ZoneId limitZone, Idempotency idempotency, Topu
      * @param cleanupCron      Spring cron (6 fields) of the job that deletes expired keys
      * @param cleanupBatchSize rows deleted per transaction; between 1 and 10,000
      * @param lockAtMostFor    a crashed instance's cleanup lock expires after this
+     * @param claimAttempts    how often a claim is retried when the key is released between our failed insert and
+     *                         our read (a race with expiry or a failed first request); between 1 and 10. Needing more
+     *                         than a few means something is wrong, so the request fails instead of looping.
      */
     public record Idempotency(Duration ttl, DataSize maxBodySize, String cleanupCron, int cleanupBatchSize,
-            Duration lockAtMostFor) {
+            Duration lockAtMostFor, int claimAttempts) {
 
         public static final Duration MIN_TTL = Duration.ofHours(1);
         public static final Duration MAX_TTL = Duration.ofDays(7);
         public static final DataSize MIN_BODY = DataSize.ofKilobytes(1);
         public static final DataSize MAX_BODY = DataSize.ofMegabytes(1);
         public static final int MAX_BATCH_SIZE = 10_000;
+        public static final int MAX_CLAIM_ATTEMPTS = 10;
 
         public Idempotency {
             if (ttl == null || ttl.compareTo(MIN_TTL) < 0 || ttl.compareTo(MAX_TTL) > 0) {
@@ -63,6 +67,10 @@ public record PaymentsProperties(ZoneId limitZone, Idempotency idempotency, Topu
             if (lockAtMostFor == null || lockAtMostFor.isNegative() || lockAtMostFor.isZero()) {
                 throw new IllegalArgumentException(
                         "trustledger.payments.idempotency.lock-at-most-for must be positive");
+            }
+            if (claimAttempts < 1 || claimAttempts > MAX_CLAIM_ATTEMPTS) {
+                throw new IllegalArgumentException(
+                        "trustledger.payments.idempotency.claim-attempts must be between 1 and " + MAX_CLAIM_ATTEMPTS);
             }
         }
     }

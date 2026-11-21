@@ -84,7 +84,7 @@ flowchart LR
 
 Modules: `shared`, `identity`, `kyc`, `wallet`, `ledger`, `payments` (built); `audit`, `privacy`, `notification`,
 `reporting` (later). Modules talk only through their `*Api` interface or events, and `ledger` depends on no other
-business module. `ModularityTests` (Spring Modulith `verify`) enforces this on every build.
+business module. `ModularityTests` (Spring Modulith `verify`) and `ArchitectureRulesTest` (ArchUnit: layers, `@Transactional` placement, `Clock`-only time, no floating point, records for DTOs) enforce this on every build.
 
 ## Run locally
 
@@ -137,7 +137,7 @@ Money paths are tested for the happy path, each rejection rule, idempotent retry
 
 Java 25 · Spring Boot 4 · Spring Security 7 (OAuth2 resource server, Keycloak) · Spring Data JPA · PostgreSQL ·
 Flyway · Spring Modulith · Redis + Bucket4j · Resilience4j · ShedLock · springdoc-openapi · AWS SDK v2 (S3) ·
-Kafka (M8) · Testcontainers · WireMock · JUnit 5 · Mockito · AssertJ.
+Kafka (M8) · Testcontainers · WireMock · ArchUnit · JUnit 5 · Mockito · AssertJ.
 
 ## Design decisions
 
@@ -153,6 +153,8 @@ Kafka (M8) · Testcontainers · WireMock · JUnit 5 · Mockito · AssertJ.
 | [0012](docs/adr/0012-spring-modulith-events-api.md) | Spring Modulith events API |
 | [0013](docs/adr/0013-shedlock-for-scheduled-jobs.md) | ShedLock for scheduled jobs |
 | [0014](docs/adr/0014-gateway-resilience-and-wiremock.md) | Gateway resilience and WireMock |
+| [0015](docs/adr/0015-archunit-architecture-rules.md) | ArchUnit for the rules inside a module |
+| [0016](docs/adr/0016-mapping-without-mapstruct.md) | Mapping with static factories, not MapStruct |
 
 ## Local authentication (Keycloak)
 

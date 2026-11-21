@@ -10,6 +10,13 @@ spring:
     multipart:
       max-file-size: 6MB
       max-request-size: 7MB
+  # Never log personal data (CLAUDE.md): by default PgJDBC appends the server's "Failing row contains (...)" detail
+  # (every column value) to constraint-violation messages, which Hibernate and GlobalExceptionHandler log. The
+  # constraint name stays in the message. Hikari passes this to the driver in every profile, Testcontainers too.
+  datasource:
+    hikari:
+      data-source-properties:
+        logServerErrorDetail: false
   jpa:
     open-in-view: false
     hibernate:
@@ -46,6 +53,11 @@ trustledger:
       TERMS: "2026-11-01"
       PRIVACY: "2026-11-01"
       MARKETING: "2026-11-01"
+  # Paginated list endpoints (the compliance review queues). A request without size gets default-size;
+  # size above max-size -> 400 VALIDATION_FAILED. max-size is capped at 1000 (startup fails above).
+  paging:
+    default-size: 20
+    max-size: 100
   # Minimum age for KYC (FR-KYC-1), counted in Asia/Kolkata. Startup fails below 18.
   kyc:
     min-age-years: 18
@@ -90,6 +102,8 @@ trustledger:
       cleanup-cron: "0 15 * * * *"
       cleanup-batch-size: 1000
       lock-at-most-for: 10m
+      # A key released between our failed insert and our read is claimed again, at most this often (1-10).
+      claim-attempts: 3
     # Top-ups (M7). min-amount: Razorpay refuses orders below ₹1.00. checkout-page: the manual-test
     # /checkout.html page (Razorpay Checkout in test mode); only application-local.yml turns it on.
     topups:

@@ -12,6 +12,7 @@ import com.trustledger.core.kyc.domain.KycDocumentRepository;
 import com.trustledger.core.kyc.domain.KycStatus;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.TrustLedgerException;
+import com.trustledger.core.shared.paging.PagingProperties;
 import java.time.Clock;
 import java.util.EnumSet;
 import java.util.List;
@@ -39,8 +40,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class KycReviewService {
 
-    public static final int MAX_PAGE_SIZE = 100;
-
     private static final Logger log = LoggerFactory.getLogger(KycReviewService.class);
 
     private final KycCaseRepository cases;
@@ -49,24 +48,24 @@ public class KycReviewService {
     private final KycDocumentProperties properties;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final PagingProperties paging;
 
     public KycReviewService(KycCaseRepository cases, KycDocumentRepository documents, DocumentStorage storage,
-            KycDocumentProperties properties, ApplicationEventPublisher events, Clock clock) {
+            KycDocumentProperties properties, ApplicationEventPublisher events, Clock clock,
+            PagingProperties paging) {
         this.cases = cases;
         this.documents = documents;
         this.storage = storage;
         this.properties = properties;
         this.events = events;
         this.clock = clock;
+        this.paging = paging;
     }
 
-    /** FULL cases in one status, oldest first (first in, first reviewed). */
+    /** FULL cases in one status, oldest first (first in, first reviewed). A missing size uses the default. */
     @Transactional(readOnly = true)
-    public KycQueuePage queue(KycStatus status, int page, int size) {
-        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
-            throw new TrustLedgerException(ErrorCode.VALIDATION_FAILED,
-                    "page must be >= 0 and size 1-" + MAX_PAGE_SIZE + ".");
-        }
+    public KycQueuePage queue(KycStatus status, int page, Integer requestedSize) {
+        int size = paging.checkedSize(page, requestedSize);
         Page<KycCase> result = cases.findByLevelAndStatus(KycLevel.FULL, status,
                 PageRequest.of(page, size, Sort.by("createdAt").ascending().and(Sort.by("id"))));
         List<UUID> ids = result.getContent().stream().map(KycCase::getId).toList();

@@ -17,6 +17,7 @@ import com.trustledger.core.payments.TransferCompleted;
 import com.trustledger.core.payments.domain.Transfer;
 import com.trustledger.core.payments.domain.TransferRepository;
 import com.trustledger.core.payments.domain.TransferStatus;
+import com.trustledger.core.shared.paging.PagingProperties;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
@@ -90,7 +91,7 @@ class HeldTransferServiceTest {
     @BeforeEach
     void setUp() {
         service = new HeldTransferService(wallets, ledger, limits, transfers, events, Clock.fixed(NOW,
-                ZoneOffset.UTC));
+                ZoneOffset.UTC), new PagingProperties(20, 100));
         transfer = Transfer.initiate(SENDER, RECEIVER, AMOUNT, "Rent", CREATED);
         ReflectionTestUtils.setField(transfer, "id", TRANSFER_ID);
         transfer.holdForReview(CREATED);
@@ -196,7 +197,7 @@ class HeldTransferServiceTest {
         assertThatThrownBy(() -> service.queue(TransferStatus.HELD_FOR_REVIEW, 0, 0))
                 .isInstanceOf(TrustLedgerException.class);
         assertThatThrownBy(() -> service.queue(TransferStatus.HELD_FOR_REVIEW, 0,
-                HeldTransferService.MAX_PAGE_SIZE + 1)).isInstanceOf(TrustLedgerException.class);
+                101)).isInstanceOf(TrustLedgerException.class);
         assertThatThrownBy(() -> service.queue(TransferStatus.HELD_FOR_REVIEW, -1, 20))
                 .isInstanceOf(TrustLedgerException.class);
     }

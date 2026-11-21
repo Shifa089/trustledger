@@ -41,14 +41,18 @@ class SecurityProbeController {
         return OK;
     }
 
+    /** Matches no role rule in SecurityConfig: must be refused for everyone (the chain fails closed). */
     @GetMapping(path = "/customer/probe", version = "1")
-    Map<String, String> anyAuthenticated() {
+    Map<String, String> unlisted() {
         return OK;
     }
 
-    /** Only "authenticated" by URL; the method rule makes it ADMIN-only. Proves method security is on. */
+    /**
+     * Only "authenticated" by URL (the test-only chain for {@code /test/**}, TestProbeSecurityConfig); the method
+     * rule makes it ADMIN-only. Proves method security is on.
+     */
     @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping(path = "/customer/method-secured", version = "1")
+    @GetMapping(path = "/test/method-secured", version = "1")
     Map<String, String> methodSecured() {
         return OK;
     }

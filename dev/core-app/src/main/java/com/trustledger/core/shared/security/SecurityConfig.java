@@ -123,10 +123,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/*/wallets/**").hasRole(CUSTOMER)
                         .requestMatchers(HttpMethod.POST, "/api/*/transfers", "/api/*/topups").hasRole(CUSTOMER)
                         .requestMatchers(HttpMethod.GET, "/api/*/transfers/*", "/api/*/topups/*").hasRole(CUSTOMER)
+                        // Any signed-in user, even one without roles yet (SPEC §5 "Any"): the first GET /me
+                        // provisions the user row; /ping echoes the token's subject and roles.
+                        .requestMatchers(HttpMethod.GET, "/api/*/me", "/api/*/ping").authenticated()
                         .requestMatchers("/actuator/**").hasRole(ADMIN)
                         // Reached only when the local-only swagger chain does not exist.
                         .requestMatchers(SWAGGER_PATHS).authenticated()
-                        .requestMatchers("/api/**").authenticated()
+                        // Fail closed: an endpoint nobody listed above is refused, not open to every signed-in
+                        // user. Adding an endpoint means adding its role rule here (and a SecurityMatrixIT row).
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(rs -> rs
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter))

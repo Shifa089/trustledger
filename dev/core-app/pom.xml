@@ -166,6 +166,16 @@
             <artifactId>spring-modulith-docs</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- ArchUnit (ADR 0015): ArchitectureRulesTest uses it directly. Spring Modulith already brings it in, and
+             needs it at RUNTIME, so it is declared with the same scope and version (a test scope here would take it
+             off the runtime classpath). Keep the version equal to what spring-modulith-core brings:
+             ./mvnw -pl core-app dependency:tree -Dincludes=com.tngtech.archunit -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <version>1.4.2</version>
+            <scope>runtime</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-testcontainers</artifactId>

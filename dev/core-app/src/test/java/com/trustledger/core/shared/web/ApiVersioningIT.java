@@ -66,10 +66,12 @@ class ApiVersioningIT {
     }
 
     @Test
-    void unknownVersionedPathIsNotFound() throws Exception {
+    void unknownVersionedPathIsRefusedBeforeRouting() throws Exception {
+        // Day 14 B (L3): the security chain ends in denyAll(), so a path with no role rule is refused before
+        // routing. 403 instead of 404 also means a caller can't map which paths exist.
         mvc.perform(get("/api/v1/does-not-exist").with(CUSTOMER))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("NOT_FOUND"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
     }
 
     @Test

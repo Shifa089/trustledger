@@ -20,6 +20,7 @@ import com.trustledger.core.payments.TransferCompleted;
 import com.trustledger.core.payments.domain.Transfer;
 import com.trustledger.core.payments.domain.TransferRepository;
 import com.trustledger.core.payments.domain.TransferStatus;
+import com.trustledger.core.shared.paging.PagingProperties;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
@@ -95,7 +96,8 @@ class TransferEventsTest {
     void setUp() {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         // The real hold path on the same mocks, so the hold test still sees wallets.hold and no posting.
-        HeldTransferService held = new HeldTransferService(wallets, ledger, limits, transfers, events, clock);
+        HeldTransferService held = new HeldTransferService(wallets, ledger, limits, transfers, events, clock,
+                new PagingProperties(20, 100));
         service = new TransferService(wallets, ledger, limits, recipients, transfers, held, events, clock);
         when(wallets.findByUser(SENDER_USER)).thenReturn(Optional.of(view(SENDER, WalletStatus.ACTIVE, 0)));
         when(recipients.resolve(eq(SENDER), any())).thenReturn(view(RECEIVER, WalletStatus.ACTIVE, 0));

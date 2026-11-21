@@ -365,17 +365,17 @@ These conventions apply to every milestone; they also go into CLAUDE.md so Claud
 | Topic | Convention |
 | --- | --- |
 | Money | Domain uses a `Money` record (`long amountMinor`, `Currency currency`). The database stores `bigint` paise. The API accepts amounts as decimal strings (`"1500.50"`); more than 2 decimals is rejected, never rounded. No `double` or `float` anywhere near money. |
-| IDs | UUIDs (time-ordered UUIDv7 preferred) generated in the application. |
+| IDs | Time-ordered UUIDv7 generated in the application: `@UuidGenerator(style = VERSION_7)` on entities, `Ids.newV7(clock)` for rows written with plain SQL. Random v4 only where unguessability matters more than order (object-storage keys, correlation IDs). |
 | Time | `Instant` in code, `timestamptz` in UTC in the database. Statements display Asia/Kolkata. Inject a `Clock` bean so tests can control time. |
-| DTOs and mapping | Java records for requests, responses and events; MapStruct for mapping. Entities never leave their module. |
+| DTOs and mapping | Java records for requests, responses and events, mapped by a static `of(...)` factory on the target record (ADR 0016; no MapStruct). Money leaves as a decimal string, personal data masked in the factory. Entities never leave their module. |
 | Lombok | Only on JPA entities (`@Getter`, `@NoArgsConstructor(access = PROTECTED)`). No `@Data` or `@Setter` on entities; state changes go through domain methods such as `wallet.freeze(reason)`. |
 | Validation | Bean Validation on request records, plus custom validators `@ValidPan`, `@ValidIndianMobile`, `@ValidAmount`. Domain objects check their own invariants too. |
 | Errors | Domain exceptions extend `TrustLedgerException(ErrorCode)`. One `@RestControllerAdvice` maps them to ProblemDetail. Never return stack traces. |
 | Transactions | `@Transactional` only on application services; `readOnly = true` for queries. No HTTP, S3 or Kafka calls while holding row locks. |
-| Concurrency | Pessimistic row locks (in ascending ID order) for wallets during money movement; `@Version` optimistic locking everywhere else. |
-| Security | Stateless resource server; deny by default. Keycloak `realm_access.roles` mapped to `ROLE_*` authorities. Ownership checks (`@PreAuthorize("@walletAccess.isOwner(#walletId)")`) stop BOLA. Actuator restricted to ADMIN, except health. Strict CORS allowlist. |
+| Concurrency | Pessimistic row locks (in ascending ID order) for wallets during money movement; `@Version` optimistic locking on every entity that is updated. Not needed on rows that are never updated (append-only or immutable: journal, ledger accounts, consents, KYC documents) or on children changed only through a versioned aggregate root (`WalletFreeze` through `Wallet`). |
+| Security | Stateless resource server; deny by default: every endpoint has its own role rule and the chain ends in `denyAll()`. Keycloak `realm_access.roles` mapped to `ROLE_*` authorities. Ownership is checked in the application service with the caller's user ID, and another user's resource gets the **same 404 as an unknown ID** (not 403), so IDs can't be probed (BOLA). Actuator restricted to ADMIN, except health. Strict CORS allowlist. |
 | Encryption | `EncryptedStringConverter` (AES-256-GCM, random 12-byte IV per value) on personal-data columns. Locally the key comes from an environment variable; on AWS from a KMS data key (envelope encryption). HMAC-SHA256 blind index for searchable fields (phone, email). |
-| Logging | Spring Boot structured JSON logging (ECS format). MDC holds `correlationId` and `userId`. Never log personal data; a masking helper is the safety net. |
+| Logging | Spring Boot structured JSON logging (ECS format). MDC holds `correlationId` and `userId`. Never log personal data; a masking helper is the safety net. Framework and driver output counts too: the JDBC driver runs with `logServerErrorDetail=false`, so constraint errors don't carry row values into logged exceptions. |
 | Configuration | `@ConfigurationProperties` records with validation (`trustledger.limits.*`, `trustledger.aml.*`, `trustledger.razorpay.*`). Profiles: `local`, `test`, `aws`. Secrets only from environment variables or AWS Secrets Manager. |
 | Database | Flyway migrations named `V{n}__{module}_{description}.sql`; `ddl-auto=validate`; `open-in-view=false`. |
 | Events | In-process: records published with `ApplicationEventPublisher` and handled by `@ApplicationModuleListener`. To Kafka: `@Externalized("trustledger.payments.transfer-completed.v1::#{#this.walletId()}")`, so the wallet ID is the message key. |
@@ -404,7 +404,7 @@ Full spec: docs/SPEC.md. Read the relevant section before every task.
 ## Stack
 Java 25, Spring Boot 4.x, Spring Security 7 (OAuth2 resource server, Keycloak),
 Spring Data JPA + PostgreSQL + Flyway, Spring Modulith, Kafka, Redis, Resilience4j,
-Bucket4j, MapStruct, Lombok (entities only), Testcontainers, JUnit, Mockito, AssertJ.
+Bucket4j, Lombok (entities only), Testcontainers, ArchUnit, JUnit, Mockito, AssertJ.
 
 ## Architecture rules (never break)
 - Modules: shared, identity, kyc, wallet, ledger, payments, audit, privacy,
@@ -419,7 +419,7 @@ Bucket4j, MapStruct, Lombok (entities only), Testcontainers, JUnit, Mockito, Ass
 
 ## Coding conventions
 - Money: Money record, long paise. Never double/float. API amounts are decimal strings.
-- Records for DTOs/events. Entities never leave their module.
+- Records for DTOs/events, mapped by a static of(...) factory on the target record. Entities never leave their module.
 - No @Data/@Setter on entities; state changes via domain methods.
 - Errors: throw TrustLedgerException(ErrorCode); global handler returns ProblemDetail.
 - @Transactional only on application services.
@@ -432,7 +432,7 @@ Bucket4j, MapStruct, Lombok (entities only), Testcontainers, JUnit, Mockito, Ass
 - Every feature ships with tests. Domain logic: unit tests. Persistence, Kafka,
   security: Testcontainers integration tests (no H2).
 - Money paths need: happy path, each rejection rule, idempotent retry, concurrency.
-- ModularityTests (Modulith verify) and ArchUnit rules must stay green.
+- ModularityTests (Modulith verify) and ArchitectureRulesTest (ArchUnit) must stay green.
 
 ## Security rules
 - No secrets in code or Git. Use .env (git-ignored) and .env.example.

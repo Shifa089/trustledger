@@ -29,9 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class IdempotencyService {
 
-    /** A key released between our failed insert and our read is claimed again; more than this is a bug. */
-    private static final int MAX_CLAIM_ATTEMPTS = 3;
-
     private final IdempotencyKeyRepository keys;
     private final PaymentsProperties properties;
     private final Clock clock;
@@ -51,7 +48,7 @@ public class IdempotencyService {
         Objects.requireNonNull(userId, "userId");
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(requestHash, "requestHash");
-        for (int attempt = 1; attempt <= MAX_CLAIM_ATTEMPTS; attempt++) {
+        for (int attempt = 1; attempt <= properties.idempotency().claimAttempts(); attempt++) {
             Instant now = clock.instant();
             if (keys.claim(userId, key, requestHash, now, now.plus(properties.idempotency().ttl()))) {
                 return new IdempotencyClaim.Claimed();

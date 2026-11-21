@@ -37,7 +37,7 @@ class IdempotencyServiceTest {
 
     static PaymentsProperties properties() {
         return new PaymentsProperties(ZoneId.of("Asia/Kolkata"), new PaymentsProperties.Idempotency(
-                Duration.ofHours(24), DataSize.ofKilobytes(16), "0 15 * * * *", 1000, Duration.ofMinutes(10)),
+                Duration.ofHours(24), DataSize.ofKilobytes(16), "0 15 * * * *", 1000, Duration.ofMinutes(10), 3),
                 new PaymentsProperties.Topups(Money.of(100, Money.INR), false),
                 new PaymentsProperties.Webhooks(DataSize.ofKilobytes(64)));
     }
@@ -103,7 +103,7 @@ class IdempotencyServiceTest {
         when(keys.find(USER, KEY)).thenReturn(Optional.empty());
 
         refused(() -> service.claim(USER, KEY, HASH), ErrorCode.REQUEST_IN_PROGRESS);
-        verify(keys, times(3)).claim(any(), any(), anyString(), any(), any());
+        verify(keys, times(3)).claim(any(), any(), anyString(), any(), any()); // claim-attempts: 3 (config)
     }
 
     @Test
