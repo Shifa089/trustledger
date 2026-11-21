@@ -20,6 +20,9 @@ spring:
       host: localhost
       port: 6379
       password: ${REDIS_PASSWORD}
+  # Kafka from infra/docker-compose.yml.
+  kafka:
+    bootstrap-servers: localhost:9092
 # Human-readable logs locally; show the correlation ID on every line.
 logging:
   pattern:
@@ -41,6 +44,10 @@ trustledger:
       secret-key: test
       create-bucket: true
   # Manual test page for Razorpay Checkout in test mode: http://localhost:8080/checkout.html
+  # Create the contract topics on the compose broker (3 partitions, replication 1).
+  events:
+    topics:
+      create: true
   payments:
     topups:
       checkout-page: true

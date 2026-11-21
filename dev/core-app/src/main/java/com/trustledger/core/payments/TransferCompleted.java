@@ -1,11 +1,13 @@
 package com.trustledger.core.payments;
 
 import com.trustledger.core.shared.EventMetadata;
+import com.trustledger.core.shared.ExternalizedEvent;
 import com.trustledger.core.shared.Money;
 import com.trustledger.events.TransferCompletedV1;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.modulith.events.Externalized;
 
 /**
  * A P2P transfer was posted to the ledger ("Transfer flow" step 7). Published inside the transfer's transaction,
@@ -14,8 +16,9 @@ import java.util.UUID;
  * <p>
  * Not published for a transfer held for review; that one publishes on approval.
  */
+@Externalized(TransferCompletedV1.TOPIC + "::#{#this.senderWalletId()}")
 public record TransferCompleted(UUID transferId, UUID senderWalletId, UUID receiverWalletId, Money amount,
-        UUID journalEntryId, Instant completedAt, EventMetadata metadata) {
+        UUID journalEntryId, Instant completedAt, EventMetadata metadata) implements ExternalizedEvent {
 
     public TransferCompleted {
         Objects.requireNonNull(transferId, "transferId");
@@ -32,6 +35,7 @@ public record TransferCompleted(UUID transferId, UUID senderWalletId, UUID recei
      * mapping sits on the source record (ADR 0016 addendum). The sender is the contract's {@code walletId} (the
      * message key); the journal entry stays internal. Pure: mapping a resubmitted event gives the same record.
      */
+    @Override
     public TransferCompletedV1 toV1() {
         return new TransferCompletedV1(metadata.eventId(), completedAt, senderWalletId, receiverWalletId, transferId,
                 amount.amountMinor(), amount.currency().getCurrencyCode());
