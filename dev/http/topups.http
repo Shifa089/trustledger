@@ -1,9 +1,9 @@
 ### Top-ups (FR-P-4, M7 part 2). Razorpay TEST MODE only, fake test data only.
 # Prerequisites: core-app running with the local profile and RAZORPAY_* test keys in .env; a token for customer1
 # from auth.http; customer1 has a wallet (kyc.http, minimum KYC is enough: MIN wallets may add up to ₹10,000).
-# To actually pay: open http://localhost:8080/checkout.html (local profile only), paste the token, pay with a
-# Razorpay test card or UPI success@razorpay. The wallet is credited by the webhook in M7 part 3; until then the
-# top-up stays PENDING.
+# To actually pay: open http://localhost:8080/checkout.html (local profile only), paste the token and the top-up
+# ID from the create response, click "Pay existing top-up", pay with UPI success@razorpay. The signed
+# payment.captured webhook credits the wallet. Full end-to-end steps (tunnel, webhook, SQL): docs/e2e-razorpay.md.
 
 ### customer1: create a ₹500 top-up -> 201 {status PENDING, gatewayOrderId "order_...", keyId "rzp_test_..."}
 # Run again unchanged -> the same 201 body with Idempotent-Replayed: true, and no second Razorpay order.
