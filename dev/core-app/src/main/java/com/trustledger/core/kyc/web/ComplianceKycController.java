@@ -7,7 +7,6 @@ import com.trustledger.core.kyc.application.KycReviewService;
 import com.trustledger.core.kyc.domain.KycCase;
 import com.trustledger.core.kyc.domain.KycStatus;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -47,7 +46,7 @@ public class ComplianceKycController {
     @GetMapping(path = "/compliance/kyc-cases", version = "1")
     KycQueuePage queue(@RequestParam(defaultValue = "SUBMITTED") KycStatus status,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(KycReviewService.MAX_PAGE_SIZE) int size) {
+            @RequestParam(required = false) Integer size) { // bounds: trustledger.paging, checked in the service
         return review.queue(status, page, size);
     }
 

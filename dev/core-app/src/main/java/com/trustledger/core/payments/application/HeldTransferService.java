@@ -8,6 +8,7 @@ import com.trustledger.core.payments.domain.TransferStatus;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
+import com.trustledger.core.shared.paging.PagingProperties;
 import com.trustledger.core.wallet.WalletApi;
 import com.trustledger.core.wallet.WalletView;
 import java.time.Clock;
@@ -46,8 +47,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class HeldTransferService {
 
-    public static final int MAX_PAGE_SIZE = 100;
-
     private static final Logger log = LoggerFactory.getLogger(HeldTransferService.class);
 
     private final WalletApi wallets;
@@ -56,15 +55,17 @@ public class HeldTransferService {
     private final TransferRepository transfers;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final PagingProperties paging;
 
     public HeldTransferService(WalletApi wallets, LedgerApi ledger, LimitChecker limits,
-            TransferRepository transfers, ApplicationEventPublisher events, Clock clock) {
+            TransferRepository transfers, ApplicationEventPublisher events, Clock clock, PagingProperties paging) {
         this.wallets = wallets;
         this.ledger = ledger;
         this.limits = limits;
         this.transfers = transfers;
         this.events = events;
         this.clock = clock;
+        this.paging = paging;
     }
 
     /**
@@ -149,12 +150,9 @@ public class HeldTransferService {
 
     /** {@code GET /compliance/transfers}: transfers in one status, oldest first (first in, first reviewed). */
     @Transactional(readOnly = true)
-    public HeldTransferPage queue(TransferStatus status, int page, int size) {
+    public HeldTransferPage queue(TransferStatus status, int page, Integer requestedSize) {
         Objects.requireNonNull(status, "status");
-        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
-            throw new TrustLedgerException(ErrorCode.VALIDATION_FAILED,
-                    "page must be >= 0 and size 1-" + MAX_PAGE_SIZE + ".");
-        }
+        int size = paging.checkedSize(page, requestedSize);
         Page<Transfer> result = transfers.findByStatus(status,
                 PageRequest.of(page, size, Sort.by("createdAt").ascending().and(Sort.by("id"))));
         return new HeldTransferPage(result.getContent().stream().map(HeldTransferView::of).toList(), page, size,

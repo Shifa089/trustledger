@@ -20,6 +20,7 @@ import com.trustledger.core.kyc.domain.KycCaseRepository;
 import com.trustledger.core.kyc.domain.KycDocument;
 import com.trustledger.core.kyc.domain.KycDocumentRepository;
 import com.trustledger.core.kyc.domain.KycStatus;
+import com.trustledger.core.shared.paging.PagingProperties;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.TrustLedgerException;
 import java.net.URI;
@@ -55,7 +56,8 @@ class KycReviewServiceTest {
     void setUp() {
         KycDocumentProperties properties = new KycDocumentProperties(DataSize.ofMegabytes(5), 10,
                 List.of(DocumentType.PAN_CARD, DocumentType.ADDRESS_PROOF), Duration.ofMinutes(5));
-        service = new KycReviewService(cases, documents, storage, properties, events, Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new KycReviewService(cases, documents, storage, properties, events, Clock.fixed(NOW, ZoneOffset.UTC),
+                new PagingProperties(20, 100));
         kycCase = KycCase.submitFull(CUSTOMER, "12 Test Street, Bengaluru", NOW);
         when(cases.lockById(CASE_ID)).thenReturn(Optional.of(kycCase));
         when(cases.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
@@ -164,7 +166,7 @@ class KycReviewServiceTest {
 
     @Test
     void queueRejectsAPageSizeAboveTheCap() {
-        assertThatThrownBy(() -> service.queue(KycStatus.SUBMITTED, 0, KycReviewService.MAX_PAGE_SIZE + 1))
+        assertThatThrownBy(() -> service.queue(KycStatus.SUBMITTED, 0, 101))
                 .isInstanceOfSatisfying(TrustLedgerException.class,
                         e -> assertThat(e.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }

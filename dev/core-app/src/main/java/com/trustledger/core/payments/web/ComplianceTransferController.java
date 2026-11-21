@@ -4,7 +4,6 @@ import com.trustledger.core.payments.application.HeldTransferPage;
 import com.trustledger.core.payments.application.HeldTransferService;
 import com.trustledger.core.payments.application.HeldTransferView;
 import com.trustledger.core.payments.domain.TransferStatus;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.Instant;
 import java.util.List;
@@ -59,7 +58,7 @@ public class ComplianceTransferController {
     @GetMapping(path = "/compliance/transfers", version = "1")
     ReviewQueueResponse queue(@RequestParam(defaultValue = "HELD_FOR_REVIEW") TransferStatus status,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(HeldTransferService.MAX_PAGE_SIZE) int size) {
+            @RequestParam(required = false) Integer size) { // bounds: trustledger.paging, checked in the service
         return ReviewQueueResponse.of(review.queue(status, page, size));
     }
 

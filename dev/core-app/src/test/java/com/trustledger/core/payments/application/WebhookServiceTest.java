@@ -66,6 +66,8 @@ class WebhookServiceTest {
         assertThat(stored.gatewayEventId()).isEqualTo("evt_1");
         assertThat(stored.eventType()).isEqualTo("payment.captured");
         assertThat(stored.receivedAt()).isEqualTo(NOW);
+        assertThat(stored.id().version()).isEqualTo(7); // time-ordered, from the injected clock (Day 14 B, L4)
+        assertThat(stored.id().getMostSignificantBits() >>> 16).isEqualTo(NOW.toEpochMilli());
         assertThat(stored.payload()).contains("pay_1").doesNotContain("example.test");
         verify(writer, never()).storeRejected(any());
     }
@@ -85,6 +87,7 @@ class WebhookServiceTest {
 
         WebhookEvent rejected = storedRejected();
         assertThat(rejected.signatureValid()).isFalse();
+        assertThat(rejected.id().version()).isEqualTo(7);
         assertThat(rejected.gatewayEventId()).isEqualTo("evt_1");
         assertThat(rejected.eventType()).isEqualTo("payment.captured");
         assertThat(rejected.payload()).doesNotContain("example.test");

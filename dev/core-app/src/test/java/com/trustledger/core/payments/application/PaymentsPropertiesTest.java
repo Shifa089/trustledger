@@ -21,7 +21,7 @@ import org.springframework.util.unit.DataSize;
 class PaymentsPropertiesTest {
 
     private static Idempotency idempotency(Duration ttl, DataSize body, String cron, int batch, Duration lock) {
-        return new Idempotency(ttl, body, cron, batch, lock);
+        return new Idempotency(ttl, body, cron, batch, lock, 3);
     }
 
     private static final Duration DAY = Duration.ofHours(24);
@@ -63,6 +63,16 @@ class PaymentsPropertiesTest {
                 .withMessageContaining("cleanup-batch-size");
         assertThatIllegalArgumentException().isThrownBy(() -> idempotency(DAY, KB16, CRON, 1, Duration.ZERO))
                 .withMessageContaining("lock-at-most-for");
+    }
+
+    @Test
+    void claimAttemptsMustBeBetweenOneAndTen() {
+        assertThat(new Idempotency(DAY, KB16, CRON, 1, TEN_MIN, 1).claimAttempts()).isEqualTo(1);
+        assertThat(new Idempotency(DAY, KB16, CRON, 1, TEN_MIN, 10).claimAttempts()).isEqualTo(10);
+        assertThatIllegalArgumentException().isThrownBy(() -> new Idempotency(DAY, KB16, CRON, 1, TEN_MIN, 0))
+                .withMessageContaining("claim-attempts");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Idempotency(DAY, KB16, CRON, 1, TEN_MIN, 11))
+                .withMessageContaining("claim-attempts");
     }
 
     @Test
@@ -115,6 +125,7 @@ class PaymentsPropertiesTest {
                     "trustledger.payments.idempotency.cleanup-cron=0 15 * * * *",
                     "trustledger.payments.idempotency.cleanup-batch-size=1000",
                     "trustledger.payments.idempotency.lock-at-most-for=10m",
+                    "trustledger.payments.idempotency.claim-attempts=3",
                     "trustledger.payments.topups.min-amount=1.00",
                     "trustledger.payments.webhooks.max-body-size=64KB");
 

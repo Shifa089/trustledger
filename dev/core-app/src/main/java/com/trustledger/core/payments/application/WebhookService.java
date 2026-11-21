@@ -4,12 +4,12 @@ import com.trustledger.core.payments.application.WebhookPayloads.Parsed;
 import com.trustledger.core.payments.domain.WebhookEvent;
 import com.trustledger.core.payments.domain.WebhookSignatureVerifier;
 import com.trustledger.core.shared.ErrorCode;
+import com.trustledger.core.shared.Ids;
 import com.trustledger.core.shared.TrustLedgerException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,20 +72,20 @@ public class WebhookService {
         String payload = parsed.map(Parsed::json).orElse(null);
 
         if (!verifier.isValid(rawBody, signature)) {
-            writer.storeRejected(WebhookEvent.rejected(UUID.randomUUID(), eventId, type, payload, now));
+            writer.storeRejected(WebhookEvent.rejected(Ids.newV7(clock), eventId, type, payload, now));
             log.warn("Rejected a Razorpay webhook: invalid signature (event {}, type {})", eventId, type);
             throw new TrustLedgerException(ErrorCode.WEBHOOK_SIGNATURE_INVALID,
                     "The webhook signature does not match the request body.");
         }
         if (eventId == null || type == null || payload == null) {
-            writer.storeRejected(WebhookEvent.rejected(UUID.randomUUID(), eventId, type, payload, now));
+            writer.storeRejected(WebhookEvent.rejected(Ids.newV7(clock), eventId, type, payload, now));
             log.warn("Rejected a signed Razorpay webhook: missing event ID, JSON body or event type (event {})",
                     eventId);
             throw new TrustLedgerException(ErrorCode.VALIDATION_FAILED,
                     "A webhook needs an X-Razorpay-Event-Id header and a JSON body with an event type.");
         }
 
-        writer.storeAccepted(WebhookEvent.accepted(UUID.randomUUID(), eventId, type, payload, now));
+        writer.storeAccepted(WebhookEvent.accepted(Ids.newV7(clock), eventId, type, payload, now));
         WebhookOutcome outcome = processor.process(eventId);
         log.info("Razorpay webhook {} ({}): {}", eventId, type, outcome);
         return outcome;

@@ -16,7 +16,7 @@ Full spec: docs/SPEC.md. Read the relevant section before every task.
 ## Stack
 Java 25, Spring Boot 4.x, Spring Security 7 (OAuth2 resource server, Keycloak),
 Spring Data JPA + PostgreSQL + Flyway, Spring Modulith, Kafka, Redis, Resilience4j,
-Bucket4j, MapStruct, Lombok (entities only), springdoc-openapi (ADR 0010), AWS SDK v2 S3 (ADR 0011), ShedLock (ADR 0013), Testcontainers, WireMock (ADR 0014),
+Bucket4j, Lombok (entities only), springdoc-openapi (ADR 0010), AWS SDK v2 S3 (ADR 0011), ShedLock (ADR 0013), Testcontainers, WireMock (ADR 0014), ArchUnit (ADR 0015),
 JUnit, Mockito, AssertJ.
 
 ## Architecture rules (never break)
@@ -32,7 +32,7 @@ JUnit, Mockito, AssertJ.
 
 ## Coding conventions
 - Money: Money record, long paise. Never double/float. API amounts are decimal strings.
-- Records for DTOs/events. Entities never leave their module.
+- Records for DTOs/events, mapped by a static of(...) factory on the target record (no MapStruct, ADR 0016). Entities never leave their module.
 - No @Data/@Setter on entities; state changes via domain methods.
 - Errors: throw TrustLedgerException(ErrorCode); global handler returns ProblemDetail.
 - @Transactional only on application services.
@@ -45,12 +45,13 @@ JUnit, Mockito, AssertJ.
 - Every feature ships with tests. Domain logic: unit tests. Persistence, Kafka,
   security: Testcontainers integration tests (no H2).
 - Money paths need: happy path, each rejection rule, idempotent retry, concurrency.
-- ModularityTests (Modulith verify) and ArchUnit rules must stay green.
+- ModularityTests (Modulith verify) and ArchitectureRulesTest (ArchUnit, ADR 0015) must stay green.
 
 ## Security rules
 - No secrets in code or Git. Use .env (git-ignored) and .env.example.
 - Only Razorpay TEST keys. Only fake test users and data.
-- Every endpoint has an explicit role rule; ownership checks prevent BOLA.
+- Every endpoint has an explicit role rule; ownership checks prevent BOLA. The security chain ends in
+  denyAll(): a new endpoint without its own rule is refused (add the rule and a SecurityMatrixIT row).
 
 ## Workflow
 - Plan first, wait for approval, then implement. Stay inside the current milestone.
