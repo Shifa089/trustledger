@@ -20,6 +20,7 @@ import com.trustledger.core.payments.TransferCompleted;
 import com.trustledger.core.payments.domain.Transfer;
 import com.trustledger.core.payments.domain.TransferRepository;
 import com.trustledger.core.payments.domain.TransferStatus;
+import com.trustledger.core.shared.EventMetadata;
 import com.trustledger.core.shared.paging.PagingProperties;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.Money;
@@ -57,6 +58,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 class TransferEventsTest {
 
     private static final Instant NOW = Instant.parse("2026-11-19T06:30:00Z");
+    // Placeholder: comparisons ignore metadata (its eventId is random); tests assert it is present separately.
+    private static final EventMetadata ANY_METADATA = new EventMetadata(UUID.randomUUID(), null);
     private static final UUID SENDER_USER = UUID.randomUUID();
     private static final UUID SENDER = UUID.randomUUID();
     private static final UUID RECEIVER = UUID.randomUUID();
@@ -129,8 +132,10 @@ class TransferEventsTest {
         assertThat(result.status()).isEqualTo(TransferStatus.COMPLETED);
         ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
         verify(events).publishEvent(published.capture());
-        assertThat(published.getAllValues()).singleElement().isEqualTo(new TransferCompleted(TRANSFER_ID, SENDER,
-                RECEIVER, Money.parse("250.00"), ENTRY_ID, NOW));
+        assertThat(published.getAllValues()).singleElement().usingRecursiveComparison().ignoringFields("metadata")
+                .isEqualTo(new TransferCompleted(TRANSFER_ID, SENDER, RECEIVER, Money.parse("250.00"), ENTRY_ID, NOW,
+                        ANY_METADATA));
+        assertThat(((TransferCompleted) published.getValue()).metadata().eventId()).isNotNull();
     }
 
     @Test

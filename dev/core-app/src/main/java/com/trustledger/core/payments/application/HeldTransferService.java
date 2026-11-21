@@ -6,6 +6,7 @@ import com.trustledger.core.payments.domain.Transfer;
 import com.trustledger.core.payments.domain.TransferRepository;
 import com.trustledger.core.payments.domain.TransferStatus;
 import com.trustledger.core.shared.ErrorCode;
+import com.trustledger.core.shared.EventMetadata;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
 import com.trustledger.core.shared.paging.PagingProperties;
@@ -125,7 +126,8 @@ public class HeldTransferService {
         wallets.credit(receiverId, amount);
         transfer.approve(officerId, entryId, now);
 
-        events.publishEvent(new TransferCompleted(transfer.getId(), senderId, receiverId, amount, entryId, now));
+        events.publishEvent(new TransferCompleted(transfer.getId(), senderId, receiverId, amount, entryId, now,
+                EventMetadata.capture(clock)));
         log.info("Transfer {} approved, journal entry {}", transfer.getId(), entryId);
         return HeldTransferView.of(transfer);
     }

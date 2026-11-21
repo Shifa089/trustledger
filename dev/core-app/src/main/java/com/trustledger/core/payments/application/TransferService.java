@@ -9,6 +9,7 @@ import com.trustledger.core.payments.TransferCompleted;
 import com.trustledger.core.payments.domain.Transfer;
 import com.trustledger.core.payments.domain.TransferRepository;
 import com.trustledger.core.shared.ErrorCode;
+import com.trustledger.core.shared.EventMetadata;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
 import com.trustledger.core.wallet.WalletApi;
@@ -121,7 +122,8 @@ public class TransferService {
         saved.complete(entryId, now);
 
         // Step 7: publish. Spring Modulith records it in event_publication in this same transaction.
-        events.publishEvent(new TransferCompleted(saved.getId(), senderId, receiverId, amount, entryId, now));
+        events.publishEvent(new TransferCompleted(saved.getId(), senderId, receiverId, amount, entryId, now,
+                EventMetadata.capture(clock)));
         log.info("Transfer {} completed, journal entry {}", saved.getId(), entryId);
 
         // Step 8 (commit, then store the response against the key) happens in the transaction proxy and in

@@ -11,6 +11,7 @@ import com.trustledger.core.payments.domain.GatewayPaymentStatus;
 import com.trustledger.core.payments.domain.Topup;
 import com.trustledger.core.payments.domain.TopupRepository;
 import com.trustledger.core.payments.domain.TopupStatus;
+import com.trustledger.core.shared.EventMetadata;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.wallet.WalletApi;
 import com.trustledger.core.wallet.WalletView;
@@ -123,7 +124,8 @@ public class TopupSettlementService {
         wallets.credit(walletId, amount);
         topup.capture(payment.paymentId(), entryId, now);
         topups.saveAndFlush(topup);
-        events.publishEvent(new TopupCaptured(topup.getId(), walletId, amount, entryId, now));
+        events.publishEvent(new TopupCaptured(topup.getId(), walletId, amount, entryId, now,
+                EventMetadata.capture(clock)));
         log.info("Top-up {} captured, payment {}, journal entry {}{}", topup.getId(), payment.paymentId(), entryId,
                 late ? " (late capture)" : "");
         return SettlementOutcome.CAPTURED;

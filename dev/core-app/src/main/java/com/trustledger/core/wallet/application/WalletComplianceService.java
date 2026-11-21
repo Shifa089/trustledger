@@ -1,6 +1,7 @@
 package com.trustledger.core.wallet.application;
 
 import com.trustledger.core.shared.ErrorCode;
+import com.trustledger.core.shared.EventMetadata;
 import com.trustledger.core.shared.TrustLedgerException;
 import com.trustledger.core.wallet.FreezeSource;
 import com.trustledger.core.wallet.WalletFrozen;
@@ -8,6 +9,7 @@ import com.trustledger.core.wallet.WalletUnfrozen;
 import com.trustledger.core.wallet.domain.Wallet;
 import com.trustledger.core.wallet.domain.WalletRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,10 +39,12 @@ public class WalletComplianceService {
     @Transactional
     public ComplianceWalletView freeze(UUID walletId, UUID officerId, String reason) {
         Wallet wallet = lock(walletId);
-        wallet.freeze(reason, FreezeSource.COMPLIANCE, officerId, clock.instant());
+        Instant now = clock.instant();
+        wallet.freeze(reason, FreezeSource.COMPLIANCE, officerId, now);
         // Flush before publishing: if the database refuses (e.g. a second open freeze), no event goes out.
         wallets.saveAndFlush(wallet);
-        events.publishEvent(new WalletFrozen(wallet.getId(), wallet.getUserId(), FreezeSource.COMPLIANCE));
+        events.publishEvent(new WalletFrozen(wallet.getId(), wallet.getUserId(), FreezeSource.COMPLIANCE, now,
+                EventMetadata.capture(clock)));
         log.info("Wallet {} frozen by officer {}", walletId, officerId); // the reason may quote personal data
         return ComplianceWalletView.of(wallet);
     }
