@@ -4,6 +4,7 @@ import com.trustledger.core.payments.application.HeldTransferPage;
 import com.trustledger.core.payments.application.HeldTransferService;
 import com.trustledger.core.payments.application.HeldTransferView;
 import com.trustledger.core.payments.domain.TransferStatus;
+import com.trustledger.core.shared.audit.Audited;
 import jakarta.validation.constraints.Min;
 import java.time.Instant;
 import java.util.List;
@@ -62,13 +63,15 @@ public class ComplianceTransferController {
         return ReviewQueueResponse.of(review.queue(status, page, size));
     }
 
+    @Audited(action = "TRANSFER_APPROVE", entityType = "TRANSFER")
     @PostMapping(path = "/compliance/transfers/{id}/approve", version = "1")
-    ReviewTransferResponse approve(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+    public ReviewTransferResponse approve(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return ReviewTransferResponse.of(review.approve(id, callers.userId(jwt)));
     }
 
+    @Audited(action = "TRANSFER_REJECT", entityType = "TRANSFER")
     @PostMapping(path = "/compliance/transfers/{id}/reject", version = "1")
-    ReviewTransferResponse reject(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+    public ReviewTransferResponse reject(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return ReviewTransferResponse.of(review.reject(id, callers.userId(jwt)));
     }
 }

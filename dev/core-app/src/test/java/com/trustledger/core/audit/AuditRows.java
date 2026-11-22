@@ -18,36 +18,36 @@ import tools.jackson.databind.json.JsonMapper;
  * from the stored columns only. That the rebuilt event hashes to the stored hash proves the canonical form survives
  * the {@code jsonb}/{@code timestamptz} round trip, which is what the verifier (Day 20) relies on.
  */
-final class AuditRows {
+public final class AuditRows {
 
-    record Row(long seq, AuditEvent event, String prevHash, String hash) {
+    public record Row(long seq, AuditEvent event, String prevHash, String hash) {
     }
 
     private static final String SELECT = """
             select seq, occurred_at, actor_id, actor_role, action, entity_type, entity_id, before::text as before_json,
-                   after::text as after_json, ip, correlation_id, prev_hash, hash
+                   after::text as after_json, ip, user_agent, correlation_id, prev_hash, hash
               from audit.audit_events""";
 
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
 
-    AuditRows(JdbcTemplate jdbc, JsonMapper json) {
+    public AuditRows(JdbcTemplate jdbc, JsonMapper json) {
         this.jdbc = jdbc;
         this.json = json;
     }
 
-    List<Row> forEntity(UUID entityId) {
+    public List<Row> forEntity(UUID entityId) {
         return jdbc.query(SELECT + " where entity_id = ? order by seq", this::row, entityId);
     }
 
-    Row single(UUID entityId, String action) {
+    public Row single(UUID entityId, String action) {
         List<Row> rows = jdbc.query(SELECT + " where entity_id = ? and action = ? order by seq", this::row,
                 entityId, action);
         assertThat(rows).as("audit rows for %s %s", action, entityId).hasSize(1);
         return rows.getFirst();
     }
 
-    List<Row> all() {
+    public List<Row> all() {
         return jdbc.query(SELECT + " order by seq", this::row);
     }
 
@@ -55,7 +55,7 @@ final class AuditRows {
      * The whole chain, in {@code seq} order: starts at genesis, every row links to the one before it, and every
      * stored hash is the hash of the row as stored.
      */
-    void assertChainIntact() {
+    public void assertChainIntact() {
         String expectedPrev = AuditHashing.GENESIS_HASH;
         for (Row row : all()) {
             assertThat(row.prevHash()).as("prev_hash of seq %d", row.seq()).isEqualTo(expectedPrev);
@@ -69,7 +69,8 @@ final class AuditRows {
         AuditEvent event = new AuditEvent(rs.getObject("occurred_at", OffsetDateTime.class).toInstant(),
                 rs.getObject("actor_id", UUID.class), rs.getString("actor_role"), rs.getString("action"),
                 rs.getString("entity_type"), rs.getObject("entity_id", UUID.class), map(rs.getString("before_json")),
-                map(rs.getString("after_json")), rs.getString("ip"), rs.getString("correlation_id"));
+                map(rs.getString("after_json")), rs.getString("ip"), rs.getString("correlation_id"),
+                rs.getString("user_agent"));
         return new Row(rs.getLong("seq"), event, rs.getString("prev_hash"), rs.getString("hash"));
     }
 

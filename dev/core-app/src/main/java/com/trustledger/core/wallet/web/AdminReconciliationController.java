@@ -1,5 +1,6 @@
 package com.trustledger.core.wallet.web;
 
+import com.trustledger.core.shared.audit.Audited;
 import com.trustledger.core.wallet.application.ReconciliationJob;
 import com.trustledger.core.wallet.application.ReconciliationReport;
 import org.slf4j.Logger;
@@ -28,8 +29,10 @@ public class AdminReconciliationController {
         this.job = job;
     }
 
+    @Audited(action = "RECONCILIATION_RUN", entityType = "RECONCILIATION_RUN", entityIdParam = "",
+            captureBefore = false)
     @PostMapping(path = "/admin/reconciliation/run", version = "1")
-    ReconciliationReport run(@AuthenticationPrincipal Jwt jwt) {
+    public ReconciliationReport run(@AuthenticationPrincipal Jwt jwt) {
         log.info("Manual reconciliation requested by user {}", callers.userId(jwt));
         return job.runNow();
     }

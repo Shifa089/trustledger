@@ -15,6 +15,9 @@ public interface KycDocumentRepository {
 
     List<KycDocument> findByCaseIdIn(Collection<UUID> caseIds);
 
+    /** Any case's document; for the audit snapshot only. Endpoints use {@link #findByIdAndCaseId}. */
+    Optional<KycDocument> findById(UUID id);
+
     /** The document only if it belongs to that case, so a case ID cannot be paired with any document ID. */
     Optional<KycDocument> findByIdAndCaseId(UUID id, UUID caseId);
 

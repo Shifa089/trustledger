@@ -221,9 +221,12 @@ class AuditTrailIT {
         assertThat(rows.forEntity(walletId)).isEmpty();
     }
 
-    /** A refused business change (second freeze of a frozen wallet) is rolled back with no audit row either. */
+    /**
+     * A refused business change (second freeze of a frozen wallet) is rolled back with no domain-fact row; the
+     * officer's refused request is recorded as such by the {@code @Audited} aspect (Day 20).
+     */
     @Test
-    void aRefusedFreezeIsNotAudited() throws Exception {
+    void aRefusedFreezeLeavesNoFactRowOnlyTheRefusedRequest() throws Exception {
         UUID walletId = wallet(user(ApiMockMvc.newSubject()));
         String officer = ApiMockMvc.newSubject();
         user(officer);
@@ -232,5 +235,8 @@ class AuditTrailIT {
         decide(officer, walletId, "freeze", "audit-freeze-3", "203.0.113.8").andExpect(status().is4xxClientError());
 
         assertThat(rows.single(walletId, "WALLET_FROZEN").event().correlationId()).isEqualTo("audit-freeze-2");
+        assertThat(rows.forEntity(walletId).stream().filter(r -> r.event().action().equals("WALLET_FREEZE"))
+                .map(r -> r.event().after().get("outcome")))
+                .containsExactly("SUCCEEDED", "REJECTED");
     }
 }

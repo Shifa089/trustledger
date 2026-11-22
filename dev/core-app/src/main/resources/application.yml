@@ -99,6 +99,9 @@ trustledger:
       TERMS: "2026-11-01"
       PRIVACY: "2026-11-01"
       MARKETING: "2026-11-01"
+  # Audit trail (FR-A-2): GET /audit/verify reads the chain this many rows per query (1-10000).
+  audit:
+    verify-batch-size: 500
   # Paginated list endpoints (the compliance review queues). A request without size gets default-size;
   # size above max-size -> 400 VALIDATION_FAILED. max-size is capped at 1000 (startup fails above).
   paging:
