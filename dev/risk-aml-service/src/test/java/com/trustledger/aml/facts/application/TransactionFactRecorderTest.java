@@ -2,9 +2,11 @@ package com.trustledger.aml.facts.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.trustledger.aml.facts.domain.Direction;
@@ -12,6 +14,7 @@ import com.trustledger.aml.facts.domain.FactSource;
 import com.trustledger.aml.facts.domain.ProcessedEventRepository;
 import com.trustledger.aml.facts.domain.TransactionFact;
 import com.trustledger.aml.facts.domain.TransactionFactRepository;
+import com.trustledger.aml.rules.application.RuleEngine;
 import com.trustledger.events.TopupCapturedV1;
 import com.trustledger.events.TransferCompletedV1;
 import java.time.Clock;
@@ -22,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 class TransactionFactRecorderTest {
 
@@ -30,9 +34,10 @@ class TransactionFactRecorderTest {
 
     private final ProcessedEventRepository processed = mock(ProcessedEventRepository.class);
     private final TransactionFactRepository facts = mock(TransactionFactRepository.class);
+    private final RuleEngine ruleEngine = mock(RuleEngine.class);
     private final List<TransactionFact> saved = new ArrayList<>();
     private final TransactionFactRecorder recorder =
-            new TransactionFactRecorder(processed, facts, Clock.fixed(NOW, ZoneOffset.UTC));
+            new TransactionFactRecorder(processed, facts, ruleEngine, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @BeforeEach
     void recordSaves() {
@@ -67,6 +72,10 @@ class TransactionFactRecorderTest {
             assertThat(fact.getOccurredAt()).isEqualTo(OCCURRED);
             assertThat(fact.getCreatedAt()).isEqualTo(NOW);
         });
+        // The rules' SQL must see both facts: flush, then evaluate the sender's and the receiver's side.
+        InOrder order = inOrder(facts, ruleEngine);
+        order.verify(facts).flush();
+        order.verify(ruleEngine).evaluate(List.of(out, in));
     }
 
     @Test
@@ -84,10 +93,13 @@ class TransactionFactRecorderTest {
             assertThat(fact.getReferenceId()).isEqualTo(event.topupId());
             assertThat(fact.getCounterpartyWalletId()).isNull();
         });
+        InOrder order = inOrder(facts, ruleEngine);
+        order.verify(facts).flush();
+        order.verify(ruleEngine).evaluate(saved);
     }
 
     @Test
-    void anAlreadyProcessedEventStoresNothing() {
+    void anAlreadyProcessedEventStoresNothingAndIsNotEvaluatedAgain() {
         TransferCompletedV1 transfer = new TransferCompletedV1(UUID.randomUUID(), OCCURRED, UUID.randomUUID(),
                 UUID.randomUUID(), UUID.randomUUID(), 100, "INR");
         TopupCapturedV1 topup = new TopupCapturedV1(UUID.randomUUID(), OCCURRED, UUID.randomUUID(),
@@ -98,5 +110,6 @@ class TransactionFactRecorderTest {
         assertThat(recorder.record(topup)).isEqualTo(RecordOutcome.DUPLICATE);
 
         verify(facts, never()).save(any());
+        verifyNoInteractions(ruleEngine);
     }
 }

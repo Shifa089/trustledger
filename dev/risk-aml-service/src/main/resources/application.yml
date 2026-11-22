@@ -68,3 +68,19 @@ trustledger:
         create: false
         partitions: 3
         replicas: 1
+    # AML rules R1-R4 (SPEC §2 "AML rules (configurable)", AmlProperties). Amounts in paise. Windows end at the
+    # injected Clock's "now". A rule that alerted for a wallet within its window doesn't alert again (R3 always does).
+    rules:
+      velocity:              # R1, MEDIUM: more than 5 outgoing transfers within 10 minutes
+        max-outgoing-transfers: 5
+        window: 10m
+      structuring:           # R2, HIGH: 3+ transactions of Rs 45,000.00-49,999.99 (both included) within 24 hours
+        min-amount-minor: 4500000
+        max-amount-minor: 4999999
+        min-transactions: 3
+        window: 24h
+      large-amount:          # R3, MEDIUM: a single transaction of Rs 1,00,000 or more
+        min-amount-minor: 10000000
+      fan-out:               # R4, HIGH: transfers to 10+ distinct recipients within 24 hours
+        min-distinct-recipients: 10
+        window: 24h

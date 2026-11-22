@@ -102,6 +102,20 @@ public class TransactionFact {
                 currency, occurredAt, now);
     }
 
+    /** Money this wallet sent to another wallet: what R1 velocity and R4 fan-out count. */
+    public boolean isOutgoingTransfer() {
+        return direction == Direction.OUT && source == FactSource.TRANSFER;
+    }
+
+    /**
+     * Money the wallet's owner moved themselves: a transfer they sent or a top-up they made (R2, R3). An incoming
+     * transfer is someone else's action, so it never raises an alert on the receiver; otherwise anyone could get a
+     * victim's wallet frozen by sending it money.
+     */
+    public boolean isInitiatedByWalletOwner() {
+        return direction == Direction.OUT || source == FactSource.TOPUP;
+    }
+
     public UUID getId() {
         return id;
     }

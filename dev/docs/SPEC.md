@@ -144,6 +144,12 @@ TrustLedger is a prepaid digital wallet: customers complete KYC, add money throu
 | R3 Large amount | A single transaction of ₹1,00,000 or more | MEDIUM |
 | R4 Fan-out | Transfers to 10 or more distinct recipients within 24 hours | HIGH |
 
+How the rules count (thresholds in `trustledger.aml.rules.*`):
+- Only money the wallet owner moves counts: outgoing transfers (R1, R4) and outgoing transfers plus top-ups (R2, R3). An incoming transfer never raises an alert on the receiver, so nobody can get someone else's wallet frozen by sending it money.
+- R2's range is ₹45,000.00 to ₹49,999.99, both included: everything just under the ₹50,000 high-value hold.
+- A window ends at the service's clock ("now") and starts one window length earlier, start included.
+- A rule that already alerted for a wallet within its window doesn't alert again; R3 alerts on every large transaction.
+
 **Non-functional requirements**
 
 - Correctness: zero balance drift under concurrent load; a request retried with the same idempotency key never moves money twice.
