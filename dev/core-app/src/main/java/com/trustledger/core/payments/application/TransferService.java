@@ -50,9 +50,11 @@ public class TransferService {
     private final HeldTransferService held;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final PaymentsMetrics metrics;
 
     public TransferService(WalletApi wallets, LedgerApi ledger, LimitChecker limits, RecipientResolver recipients,
-            TransferRepository transfers, HeldTransferService held, ApplicationEventPublisher events, Clock clock) {
+            TransferRepository transfers, HeldTransferService held, ApplicationEventPublisher events, Clock clock,
+            PaymentsMetrics metrics) {
         this.wallets = wallets;
         this.ledger = ledger;
         this.limits = limits;
@@ -61,9 +63,12 @@ public class TransferService {
         this.held = held;
         this.events = events;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     /**
+     * Counted in {@link PaymentsMetrics}: COMPLETED or HELD_FOR_REVIEW after the commit, FAILED for a refusal.
+     *
      * @return the COMPLETED transfer, or HELD_FOR_REVIEW at or above the high-value threshold
      * @throws TrustLedgerException {@code KYC_REQUIRED} (no wallet, or a tier without P2P),
      *         {@code VALIDATION_FAILED} (own wallet, bad amount or note), {@code NOT_FOUND} (no such recipient),
@@ -73,6 +78,19 @@ public class TransferService {
     @Transactional
     public TransferResult transfer(TransferCommand command) {
         Objects.requireNonNull(command, "command");
+        TransferResult result;
+        try {
+            result = execute(command);
+        } catch (TrustLedgerException refused) {
+            metrics.transferRefused();
+            throw refused;
+        }
+        metrics.transferAccepted(result.status(), command.amount());
+        return result;
+    }
+
+    /** Steps 2 to 7, inside the transaction of {@link #transfer}. */
+    private TransferResult execute(TransferCommand command) {
         Instant now = clock.instant();
 
         // Step 2: validate. The sender wallet is the caller's own (no BOLA); the receiver is resolved without

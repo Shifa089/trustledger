@@ -20,6 +20,7 @@ import com.trustledger.core.payments.domain.TopupStatus;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -42,7 +43,7 @@ class TopupServiceTest {
 
     private final TopupWriter writer = mock(TopupWriter.class);
     private final PaymentGateway gateway = mock(PaymentGateway.class);
-    private final TopupService service = new TopupService(writer, gateway);
+    private final TopupService service = new TopupService(writer, gateway, new PaymentsMetrics(new SimpleMeterRegistry()));
 
     private static Topup created() {
         Topup topup = Topup.create(WALLET, AMOUNT, NOW);

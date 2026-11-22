@@ -1,0 +1,15 @@
+# Grafana dashboard provider for the lgtm container (compose profile "obs", M12). docker-compose.yml mounts this
+# file into Grafana's provisioning folder and the dashboard JSON next to it; Grafana loads it at start and every
+# 30 s, so an edited JSON shows up without a restart. Changes made in the UI are not saved back to the file.
+apiVersion: 1
+
+providers:
+  - name: "TrustLedger"
+    folder: "TrustLedger"
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /otel-lgtm/trustledger-dashboards
+      foldersFromFilesStructure: false

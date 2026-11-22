@@ -5,6 +5,7 @@ import com.trustledger.core.payments.domain.GatewayRejectedException;
 import com.trustledger.core.payments.domain.GatewayUnavailableException;
 import com.trustledger.core.payments.domain.PaymentGateway;
 import com.trustledger.core.payments.domain.Topup;
+import com.trustledger.core.payments.domain.TopupStatus;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
 import java.util.Objects;
@@ -38,10 +39,12 @@ public class TopupService {
 
     private final TopupWriter writer;
     private final PaymentGateway gateway;
+    private final PaymentsMetrics metrics;
 
-    TopupService(TopupWriter writer, PaymentGateway gateway) {
+    TopupService(TopupWriter writer, PaymentGateway gateway, PaymentsMetrics metrics) {
         this.writer = writer;
         this.gateway = gateway;
+        this.metrics = metrics;
     }
 
     /**
@@ -62,6 +65,7 @@ public class TopupService {
         } catch (GatewayUnavailableException | GatewayRejectedException e) {
             try {
                 writer.markFailed(topupId);
+                metrics.topup(TopupStatus.FAILED);
             } catch (RuntimeException markFailure) {
                 // Keep the gateway error as the answer; the row stays CREATED and the reconciler cleans it up.
                 e.addSuppressed(markFailure);
@@ -71,6 +75,7 @@ public class TopupService {
         }
 
         Topup pending = writer.markPending(topupId, order.orderId());
+        metrics.topup(TopupStatus.PENDING);
         log.info("Top-up {} pending, gateway order {}", topupId, order.orderId());
         return TopupResult.of(pending, gateway.checkoutKeyId());
     }

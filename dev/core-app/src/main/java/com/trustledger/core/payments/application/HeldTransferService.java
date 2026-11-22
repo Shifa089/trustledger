@@ -57,9 +57,11 @@ public class HeldTransferService {
     private final ApplicationEventPublisher events;
     private final Clock clock;
     private final PagingProperties paging;
+    private final PaymentsMetrics metrics;
 
     public HeldTransferService(WalletApi wallets, LedgerApi ledger, LimitChecker limits,
-            TransferRepository transfers, ApplicationEventPublisher events, Clock clock, PagingProperties paging) {
+            TransferRepository transfers, ApplicationEventPublisher events, Clock clock, PagingProperties paging,
+            PaymentsMetrics metrics) {
         this.wallets = wallets;
         this.ledger = ledger;
         this.limits = limits;
@@ -67,6 +69,7 @@ public class HeldTransferService {
         this.events = events;
         this.clock = clock;
         this.paging = paging;
+        this.metrics = metrics;
     }
 
     /**
@@ -129,6 +132,7 @@ public class HeldTransferService {
         events.publishEvent(new TransferCompleted(transfer.getId(), senderId, receiverId, amount, entryId, now,
                 EventMetadata.capture(clock)));
         log.info("Transfer {} approved, journal entry {}", transfer.getId(), entryId);
+        metrics.transferReviewed(TransferStatus.COMPLETED);
         return HeldTransferView.of(transfer);
     }
 
@@ -147,6 +151,7 @@ public class HeldTransferService {
         wallets.releaseHold(transfer.getSenderWalletId(), transfer.amount());
         transfer.reject(officerId, now);
         log.info("Transfer {} rejected, hold released", transfer.getId());
+        metrics.transferReviewed(TransferStatus.REJECTED);
         return HeldTransferView.of(transfer);
     }
 

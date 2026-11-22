@@ -75,6 +75,28 @@ management:
     metrics:
       export:
         enabled: false
+        # Seconds, so timers arrive in Prometheus as *_seconds_* (the convention), not *_milliseconds_*.
+        base-time-unit: seconds
+  # Actuator (SPEC §6 Security): health public, everything else ADMIN (SecurityConfig). Anonymous callers get only
+  # the status; an ADMIN token also sees the components. Liveness and readiness are on by default in Boot 4:
+  # /actuator/health/liveness and /actuator/health/readiness. Readiness also needs the database.
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+      roles: ADMIN
+      group:
+        readiness:
+          include: readinessState,db
+  # Histogram buckets for http.server.requests, so Grafana can compute p95/p99 per endpoint (M12 dashboard).
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
 
 logging:
   level:

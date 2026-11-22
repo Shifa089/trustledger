@@ -85,3 +85,31 @@ Option 1.
   core-app, and by `KafkaTracingIT` and `ObservabilityConfigIT` in risk-aml-service.
 - **Upgrades:** the alpha appender may change its API between releases. It is pinned, and the property
   comment explains how the version was chosen.
+
+## Addendum (Day 23 Session B): metrics, actuator, dashboard
+
+- **Custom metrics, no new dependency.** Micrometer meters registered by the code that changes the state:
+  - `trustledger.transfers{status}` and `trustledger.transfer.amount` (rupee buckets 100 … 2,00,000) in
+    `PaymentsMetrics` (core-app, payments). Counts are **state changes**: a held transfer counts as
+    `HELD_FOR_REVIEW`, then `COMPLETED` or `REJECTED` on review; a refusal counts as `FAILED`.
+  - `trustledger.topups{status}`: `PENDING`, `FAILED`, `CAPTURED`, `PARKED`, `EXPIRED`.
+  - `trustledger.aml.alerts{rule,severity}` in `AmlAlertMetrics` (risk-aml-service); every configured rule is
+    registered at 0.
+  - `trustledger.reconciliation.mismatches{reason}` (M6, unchanged).
+  - `trustledger.gateway.circuit.state{name,state}`: one gauge per Resilience4j state, 1 for the current one. Written
+    by hand in `CircuitBreakerStateGauge` instead of adding `resilience4j-micrometer`: one class versus a new
+    dependency with its own binder setup.
+- **Counted after the commit** (`TransactionSynchronization.afterCommit`), so a rolled-back change is never counted.
+  Tags are enum values only (no IDs, no personal data), so the number of series stays small.
+- **Prometheus names.** OTLP metrics go through the LGTM collector into Prometheus, which turns dots into underscores,
+  adds `_total` to counters and the unit to timers. `management.otlp.metrics.export.base-time-unit: seconds` gives
+  `http_server_requests_seconds_*` (the default, milliseconds, gave `*_milliseconds_*`). No base unit on the amount
+  summary, or Prometheus would append it to the name. `percentiles-histogram` is on for `http.server.requests`, so
+  p95/p99 are computed in Prometheus from buckets (aggregatable across instances), not precomputed in the app.
+- **Actuator.** Exposed: `health`, `info`, `metrics`. Public: `GET /actuator/health`, `/health/liveness` and
+  `/health/readiness` (probes are on by default in Boot 4; readiness includes `db`). `show-details` and
+  `show-components` are `when-authorized` with role ADMIN, so anonymous callers see only the status. Everything else
+  under `/actuator` is ADMIN in both security chains, which still end in `denyAll()`.
+- **Dashboard** `infra/grafana/trustledger-dashboard.json` (uid `trustledger-overview`), provisioned into the lgtm
+  container by `infra/grafana/dashboards.yaml` (read-only mounts). `GrafanaDashboardTest` keeps its queries in step
+  with the meter names.

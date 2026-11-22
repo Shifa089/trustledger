@@ -23,6 +23,7 @@ import com.trustledger.aml.rules.domain.AlertDetails;
 import com.trustledger.aml.rules.domain.AmlRule;
 import com.trustledger.aml.rules.domain.Severity;
 import com.trustledger.aml.rules.domain.WalletEvaluationLock;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -53,6 +54,7 @@ class RuleEngineTest {
     private final List<AmlCase> savedCases = new ArrayList<>();
     private final List<Alert> savedAlerts = new ArrayList<>();
     private final List<FreezeRequest> savedFreezeRequests = new ArrayList<>();
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
 
     @BeforeEach
     void persistLikeJpa() {
@@ -122,6 +124,27 @@ class RuleEngineTest {
         engine(rule("R4", Severity.HIGH, fact -> true, Duration.ofHours(24))).evaluate(List.of(outgoing(LOW_WALLET)));
 
         verify(freezeRequests, never()).save(any());
+    }
+
+    // --- M12: trustledger.aml.alerts{rule,severity} ---------------------------------------------------------------
+
+    @Test
+    void eachRaisedAlertIsCountedPerRuleAndASuppressedHitIsNot() {
+        when(alerts.existsByWalletIdAndRuleCodeAndCreatedAtGreaterThanEqual(eq(HIGH_WALLET), eq("R4"), any()))
+                .thenReturn(true);
+        RuleEngine engine = engine(rule("R2", Severity.HIGH, fact -> true),
+                rule("R4", Severity.HIGH, fact -> true, Duration.ofHours(24)),
+                rule("R1", Severity.MEDIUM, fact -> false));
+
+        engine.evaluate(List.of(outgoing(LOW_WALLET), outgoing(HIGH_WALLET)));
+
+        assertThat(alertCount("R2", "HIGH")).isEqualTo(2.0);
+        assertThat(alertCount("R4", "HIGH")).isEqualTo(1.0);
+        assertThat(alertCount("R1", "MEDIUM")).as("registered at 0 although it never fired").isZero();
+    }
+
+    private double alertCount(String rule, String severity) {
+        return meters.get(AmlAlertMetrics.ALERTS).tag("rule", rule).tag("severity", severity).counter().count();
     }
 
     @Test
@@ -239,7 +262,7 @@ class RuleEngineTest {
 
     private RuleEngine engine(AmlRule... rules) {
         return new RuleEngine(List.of(rules), lock, cases, alerts, freezeRequests, caseEvents,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC), new AmlAlertMetrics(meters, List.of(rules)));
     }
 
     private static AmlRule rule(String code, Severity severity, Predicate<TransactionFact> fires) {
