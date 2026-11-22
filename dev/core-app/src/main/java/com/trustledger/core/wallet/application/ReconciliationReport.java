@@ -1,8 +1,10 @@
 package com.trustledger.core.wallet.application;
 
 import com.trustledger.core.shared.Money;
+import com.trustledger.core.shared.audit.AuditDetails;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -16,12 +18,19 @@ import java.util.UUID;
  * @param truncated      whether more were found than {@code listed} holds
  */
 public record ReconciliationReport(long walletsChecked, long mismatches, long unlinked, List<Mismatch> listed,
-        boolean truncated, Instant startedAt, Instant finishedAt) {
+        boolean truncated, Instant startedAt, Instant finishedAt) implements AuditDetails {
 
     public ReconciliationReport {
         listed = List.copyOf(listed);
         Objects.requireNonNull(startedAt, "startedAt");
         Objects.requireNonNull(finishedAt, "finishedAt");
+    }
+
+    /** The audit trail records the counts of a manual run (FR-A-1), not the listed wallets. */
+    @Override
+    public Map<String, Object> auditDetails() {
+        return Map.of("walletsChecked", walletsChecked, "mismatches", mismatches, "unlinked", unlinked,
+                "truncated", truncated);
     }
 
     public enum Reason {

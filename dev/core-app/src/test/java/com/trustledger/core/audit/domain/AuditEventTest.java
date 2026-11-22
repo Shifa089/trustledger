@@ -36,6 +36,39 @@ class AuditEventTest {
         assertThat(event(Instant.EPOCH, "WALLET_CREATED", "2001:db8::1", null).ip()).isEqualTo("2001:db8::1");
     }
 
+    // ---- user agent (Day 20) ----
+
+    private static AuditEvent withUserAgent(String userAgent) {
+        return new AuditEvent(Instant.EPOCH, null, "SYSTEM", "WALLET_FREEZE", "WALLET",
+                UUID.fromString("00000000-0000-7000-8000-000000000001"), null, null, null, null, userAgent);
+    }
+
+    @Test
+    void aMissingUserAgentLeavesTheCanonicalJsonOfDay19Unchanged() {
+        AuditEvent before = new AuditEvent(Instant.EPOCH, null, "SYSTEM", "WALLET_FREEZE", "WALLET",
+                UUID.fromString("00000000-0000-7000-8000-000000000001"), null, null, null, null);
+
+        assertThat(withUserAgent(null).canonicalJson()).isEqualTo(before.canonicalJson())
+                .doesNotContain("userAgent");
+    }
+
+    @Test
+    void aUserAgentIsHashedWhenPresent() {
+        AuditEvent event = withUserAgent("Mozilla/5.0 (Test)");
+
+        assertThat(event.canonicalJson()).endsWith(",\"userAgent\":\"Mozilla/5.0 (Test)\"}");
+        assertThat(AuditHashing.hash(AuditHashing.GENESIS_HASH, event))
+                .isNotEqualTo(AuditHashing.hash(AuditHashing.GENESIS_HASH, withUserAgent(null)));
+    }
+
+    @Test
+    void theUserAgentIsNormalisedSoTheStoredValueIsTheHashedOne() {
+        assertThat(withUserAgent("  curl/8.0\r\n\u0000 ").userAgent()).isEqualTo("curl/8.0");
+        assertThat(withUserAgent(" \t ").userAgent()).isNull();
+        assertThat(withUserAgent("x".repeat(300)).userAgent()).hasSize(AuditEvent.MAX_USER_AGENT_LENGTH);
+        assertThat(withUserAgent("Agent\u0085Name").userAgent()).isEqualTo("AgentName");
+    }
+
     @Test
     void actionAndEntityTypeMustBeCodes() {
         assertThatThrownBy(() -> event(Instant.EPOCH, "wallet frozen", null, null))

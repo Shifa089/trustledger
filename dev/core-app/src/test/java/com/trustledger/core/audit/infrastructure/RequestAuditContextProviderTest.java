@@ -50,13 +50,21 @@ class RequestAuditContextProviderTest {
         SecurityContextHolder.getContext().setAuthentication(token("kc-officer", "ROLE_COMPLIANCE_OFFICER"));
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("203.0.113.7");
+        request.addHeader("User-Agent", "TrustLedger-Console/1.0");
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
         MDC.put(CorrelationIdFilter.MDC_KEY, "corr-42");
 
         AuditContext context = provider.current();
 
         assertThat(context).isEqualTo(new AuditContext(new AuditActor(officer, "COMPLIANCE_OFFICER"), "203.0.113.7",
-                "corr-42"));
+                "corr-42", "TrustLedger-Console/1.0"));
+    }
+
+    @Test
+    void aRequestWithoutUserAgentHasNone() {
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+
+        assertThat(provider.current().userAgent()).isNull();
     }
 
     @Test

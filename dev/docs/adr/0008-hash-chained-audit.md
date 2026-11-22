@@ -104,3 +104,82 @@ any depth. Today's events carry no personal data, so the masker is a safety net 
   code is on the money path and gets the same test rigour.
 - Day 20: `GET /audit/verify` walks the chain with the same `AuditEvent.canonicalJson()` and reports the first
   broken `seq`. The `@Audited` aspect covers compliance and admin actions that publish no domain event.
+
+## Day 20 addendum: `@Audited` endpoints, the user agent, and verification
+
+### 4. Officer and admin requests: an `@Audited` aspect around the endpoint
+
+Nine compliance and admin endpoints carry `@Audited(action, entityType, entityIdParam)`: KYC verify, approve and
+reject, KYC document view, wallet freeze and unfreeze, held transfer approve and reject, and the manual
+reconciliation run. The annotation and two small SPIs live in the shared kernel (`shared.audit`), so `kyc`,
+`wallet` and `payments` can be audited without depending on `audit`, and `ledger` stays independent:
+
+- `AuditSnapshotSource` (one bean per entity type, in the owning module's application layer) returns the entity's
+  auditable state: status, level, tier, amount and who decided. Never personal data, free text (reasons, notes) or
+  a credential (the presigned URL). The aspect takes a snapshot before the call and the recorder takes one after.
+  The masker still runs over both as a safety net.
+- `AuditDetails` (on request or response records) adds facts about the call: `reasonLength` (never the reason) and
+  the reconciliation counts.
+
+Every call writes exactly one event, whose `after` ends with `"outcome": "SUCCEEDED"`, or
+`"outcome": "REJECTED", "errorCode": ...` when a business rule refused it (a `TrustLedgerException`: the maker
+trying to approve, a second decision, an unknown ID). Refused attempts are exactly what an auditor wants to see.
+Calls refused by security never reach the aspect (it runs inside `@PreAuthorize`) and are in the security log.
+Validation failures (400) and 500s are not audited.
+
+**Why around the endpoint, after the commit, and not in the business transaction like section 2?** The controller
+is outside the service's transaction, so the event is written in its own short transaction once the business
+transaction has ended.
+
+| | Aspect around the controller (chosen) | `@Audited` on application service methods |
+|---|---|---|
+| Atomic with the change | No: a separate transaction after the commit | Yes |
+| Refused attempts | Recorded (REJECTED + error code) | Lost: they roll back with the change |
+| HTTP context (IP, user agent) | On the thread | On the thread |
+| Read actions (document view, a read-only transaction) | Fine | An insert in a read-only transaction fails |
+| Reconciliation (ShedLock, its own transactions) | Untouched | It would have to join or wrap them |
+
+The gap is that a business change can commit and its request event then fail to write (the database becomes
+unreachable between the two transactions). The aspect never turns a committed change into an error response.
+It logs `AUDIT WRITE FAILED` at ERROR with the action, entity ID and correlation ID, for an alert to follow up. The
+state changes that matter most are also covered atomically by section 2: freeze and unfreeze (WALLET_FROZEN,
+WALLET_UNFROZEN), transfer approval (TRANSFER_COMPLETED) and KYC approval (KYC_LEVEL_UPGRADED). A freeze therefore
+has two events: the officer's request (`WALLET_FREEZE`) and the domain fact (`WALLET_FROZEN`, which also covers
+AML freezes by SYSTEM). They are joined by the correlation ID, and the fact always has the lower `seq`.
+
+A snapshot is read without a lock, so under a concurrent change `before` can be slightly stale. The atomic fact rows
+are authoritative for state; the request row is authoritative for who asked what, when, and with what result.
+
+### 5. Adding a field to the hash: the user agent
+
+FR-A-1 lists actor, role, IP and correlation ID; Day 20 adds the request's `User-Agent` (column `user_agent`,
+V20). Adding a field to the canonical JSON changes every hash, which would make every existing chain fail
+verification. Rule: **a field added after the first version is written to the canonical JSON only when it is not
+null.** Every row written before the column existed has `user_agent = NULL`, so its canonical form, and its hash,
+are unchanged; a unit test pins that. The header is normalised before hashing (control characters removed, trimmed,
+cut to 256 characters, blank becomes null), so the stored value is exactly the hashed one and a header can't inject
+line breaks.
+
+### 6. Verification: `GET /audit/verify` and `GET /audit/events`
+
+`ChainVerifier` (domain, pure) walks the rows in `seq` order. For each row it checks that `prev_hash` equals the
+previous row's stored hash (genesis for the first row), and that the content rebuilt from the stored columns hashes
+to the stored `hash`. It stops at the first failure:
+
+| Tampering | Reported at | Reason |
+|---|---|---|
+| A column of row *n* edited | *n* | `HASH_MISMATCH` |
+| Row *n* edited and its own hash recomputed | *n+1* | `PREV_HASH_MISMATCH` |
+| Row *n* deleted | the next row | `PREV_HASH_MISMATCH` |
+| A state edited into something that is not an object, or a fraction | *n* | `UNREADABLE` |
+
+The service reads in keyset batches (`trustledger.audit.verify-batch-size`) inside one REPEATABLE READ read-only
+transaction: one consistent snapshot, no lock, so writers are never blocked by an auditor. The response carries
+`lastSeq` and `lastHash`. **Deleting the newest rows leaves a valid, shorter chain**, which only a copy of
+`lastHash` kept outside the database can reveal (the anchoring follow-up above).
+
+`GET /audit/events` returns the stored rows as they are (hashes included, newest first) with optional filters on
+entity type, entity ID, actor, action and a half-open `[from, to)` range on `occurred_at`, paginated with
+`trustledger.paging`. V20 adds indexes on `(actor_id, seq)` and `occurred_at`. Both endpoints are AUDITOR only.
+
+Dependency: `spring-boot-starter-aspectj` for the aspect (ADR 0018).

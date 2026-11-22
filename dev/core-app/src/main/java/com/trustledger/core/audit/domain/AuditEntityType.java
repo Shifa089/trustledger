@@ -6,5 +6,8 @@ public enum AuditEntityType {
     USER,
     WALLET,
     TOPUP,
-    TRANSFER
+    TRANSFER,
+    KYC_CASE,
+    KYC_DOCUMENT,
+    RECONCILIATION_RUN
 }

@@ -5,9 +5,11 @@ import com.trustledger.core.audit.domain.AuditActor;
 import com.trustledger.core.audit.domain.AuditContext;
 import com.trustledger.core.identity.IdentityApi;
 import com.trustledger.core.shared.web.CorrelationIdFilter;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.MDC;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,6 +26,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  *       jobs and listeners that run after commit on another thread have none.</li>
  *   <li>IP: the servlet request's remote address. With a proxy in front, Boot's {@code forward-headers-strategy}
  *       decides whether that is the client.</li>
+ *   <li>user agent: the request's {@code User-Agent} header, as sent (normalised by {@code AuditEvent}).</li>
  *   <li>correlation ID: the MDC value set by {@link CorrelationIdFilter} (or by the Kafka consumer).</li>
  * </ul>
  */
@@ -38,7 +41,9 @@ class RequestAuditContextProvider implements AuditContextProvider {
 
     @Override
     public AuditContext current() {
-        return new AuditContext(actor(), ip(), MDC.get(CorrelationIdFilter.MDC_KEY));
+        HttpServletRequest request = request();
+        return new AuditContext(actor(), request == null ? null : request.getRemoteAddr(),
+                MDC.get(CorrelationIdFilter.MDC_KEY), request == null ? null : request.getHeader(HttpHeaders.USER_AGENT));
     }
 
     private AuditActor actor() {
@@ -51,9 +56,9 @@ class RequestAuditContextProvider implements AuditContextProvider {
         return AuditActor.of(userId, authorities);
     }
 
-    private static String ip() {
+    private static HttpServletRequest request() {
         if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
-            return attributes.getRequest().getRemoteAddr();
+            return attributes.getRequest();
         }
         return null;
     }
