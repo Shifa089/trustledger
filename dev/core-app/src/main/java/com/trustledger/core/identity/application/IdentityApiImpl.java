@@ -2,7 +2,9 @@ package com.trustledger.core.identity.application;
 
 import com.trustledger.core.identity.IdentityApi;
 import com.trustledger.core.identity.NotificationContact;
+import com.trustledger.core.identity.PersonalDataExport;
 import com.trustledger.core.identity.UserView;
+import com.trustledger.core.identity.domain.ConsentRepository;
 import com.trustledger.core.identity.domain.User;
 import com.trustledger.core.identity.domain.UserRepository;
 import com.trustledger.core.identity.domain.UserStatus;
@@ -21,11 +23,13 @@ import org.springframework.transaction.annotation.Transactional;
 class IdentityApiImpl implements IdentityApi {
 
     private final UserRepository users;
+    private final ConsentRepository consents;
     private final BlindIndex blindIndex;
     private final Clock clock;
 
-    IdentityApiImpl(UserRepository users, BlindIndex blindIndex, Clock clock) {
+    IdentityApiImpl(UserRepository users, ConsentRepository consents, BlindIndex blindIndex, Clock clock) {
         this.users = users;
+        this.consents = consents;
         this.blindIndex = blindIndex;
         this.clock = clock;
     }
@@ -67,6 +71,20 @@ class IdentityApiImpl implements IdentityApi {
                 .filter(user -> user.getStatus() == UserStatus.ACTIVE)
                 .filter(user -> user.getEmail() != null && !user.getEmail().isBlank())
                 .map(user -> new NotificationContact(user.getId(), user.getEmail()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<PersonalDataExport> exportPersonalData(UUID userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+        return users.findById(userId).map(user -> new PersonalDataExport(user.getId(), user.getEmail(),
+                user.getPhone(), user.getFullName(), UserView.Status.valueOf(user.getStatus().name()),
+                user.getCreatedAt(), consents.findByUserIdOrderBySeqAsc(userId).stream()
+                        .map(c -> new PersonalDataExport.ConsentRecord(c.getPurpose().name(), c.getPolicyVersion(),
+                                c.isGranted(), c.getCapturedAt(), c.getIp()))
+                        .toList()));
     }
 
     @Override

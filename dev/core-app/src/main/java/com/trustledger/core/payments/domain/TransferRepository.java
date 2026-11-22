@@ -2,6 +2,7 @@ package com.trustledger.core.payments.domain;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -31,5 +32,8 @@ public interface TransferRepository {
      * statuses (0 if none). Uses the {@code (sender_wallet_id, created_at)} index. For a limit check to be
      * consistent, the caller holds the sender wallet's row lock (see {@code LimitChecker}).
      */
+    /** Every transfer the wallet sent or received, oldest first (a data export, FR-PR-2). */
+    List<Transfer> findInvolving(UUID walletId);
+
     long sumOutgoingSince(UUID senderWalletId, Instant fromInclusive, Collection<TransferStatus> statuses);
 }

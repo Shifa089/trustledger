@@ -33,6 +33,9 @@ public interface TopupRepository {
      */
     long sumCreatedSince(UUID walletId, Instant fromInclusive, Collection<TopupStatus> statuses);
 
+    /** Every top-up of the wallet, oldest first (a data export, FR-PR-2). */
+    List<Topup> findByWalletIdOrderByCreatedAtAscIdAsc(UUID walletId);
+
     /** Sum in minor units of all the wallet's top-ups with one of the statuses (0 if none). */
     long sumByStatus(UUID walletId, Collection<TopupStatus> statuses);
 }

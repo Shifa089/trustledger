@@ -94,6 +94,21 @@ class SecurityMatrixIT {
             "GET, /api/v1/audit/verify,                   COMPLIANCE_OFFICER, 403",
             "GET, /api/v1/audit/verify,                   ADMIN,              403",
             "GET, /api/v1/audit/verify,                   AUDITOR,            200",
+            // Privacy (M10, Day 21, FR-PR-2): CUSTOMER only. POST as a CUSTOMER is covered by DataExportIT (202).
+            "POST, /api/v1/me/data-export,                NONE,               401",
+            "POST, /api/v1/me/data-export,                NO_ROLES,           403",
+            "POST, /api/v1/me/data-export,                COMPLIANCE_OFFICER, 403",
+            "POST, /api/v1/me/data-export,                ADMIN,              403",
+            "POST, /api/v1/me/data-export,                AUDITOR,            403",
+            "GET, /api/v1/me/data-export,                 CUSTOMER,           403",
+            "GET, /api/v1/me/data-requests,               NONE,               401",
+            "GET, /api/v1/me/data-requests,               NO_ROLES,           403",
+            // Past security; this MockMvc has no JIT filter, so the unprovisioned caller gets 404 (as for transfers).
+            "GET, /api/v1/me/data-requests,               CUSTOMER,           404",
+            "GET, /api/v1/me/data-requests,               COMPLIANCE_OFFICER, 403",
+            "GET, /api/v1/me/data-requests,               ADMIN,              403",
+            "GET, /api/v1/me/data-requests,               AUDITOR,            403",
+            "POST, /api/v1/me/data-requests,              CUSTOMER,           403",
             // An endpoint with no role rule fails closed (Day 14 B, L3): refused for every role, even with a token.
             "GET, /api/v1/customer/probe,                 NONE,               401",
             "GET, /api/v1/customer/probe,                 NO_ROLES,           403",

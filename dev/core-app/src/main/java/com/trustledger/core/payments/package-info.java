@@ -28,7 +28,8 @@
  * Payments depends on identity, wallet and ledger through their public APIs only
  * ({@link com.trustledger.core.identity.IdentityApi}, {@link com.trustledger.core.wallet.WalletApi},
  * {@link com.trustledger.core.ledger.LedgerApi}). Its public API is the {@code TransferCompleted} and
- * {@code TopupCaptured} events;
+ * {@code TopupCaptured} events, and the read-only {@link com.trustledger.core.payments.PaymentsApi} (a wallet's
+ * transfers and top-ups as {@code TransferRecord} and {@code TopupRecord}, for the data export, FR-PR-2);
  * everything in sub-packages is internal.
  */
 package com.trustledger.core.payments;

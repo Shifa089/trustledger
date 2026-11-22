@@ -124,6 +124,17 @@ trustledger:
       region: ${AWS_REGION:ap-south-1}
       path-style: false
       create-bucket: false
+  # Privacy (FR-PR-2, M10). export-link-ttl: lifetime of the presigned download link GET /me/data-requests hands out
+  # for a completed export (at most 10 minutes; a fresh link on every call). max-listed-requests: newest N listed.
+  # storage: a bucket of its own for export files (SSE-S3; an S3 lifecycle rule expires them, M14).
+  privacy:
+    export-link-ttl: 10m
+    max-listed-requests: 50
+    storage:
+      bucket: ${TRUSTLEDGER_PRIVACY_BUCKET:trustledger-data-exports}
+      region: ${AWS_REGION:ap-south-1}
+      path-style: false
+      create-bucket: false
   # Wallet limits per tier (SPEC §2 limits table, FR-W-2). Amounts are QUOTED decimal strings in rupees
   # (bound to Money, never floats). Startup fails on unsafe values, e.g. MIN allowing P2P, or a high-value
   # threshold above the daily transfer limit. The RBI PPI values must be re-verified before production.

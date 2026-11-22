@@ -33,6 +33,13 @@ public interface IdentityApi {
     Optional<NotificationContact> findNotificationContact(UUID userId);
 
     /**
+     * The user's own profile in clear plus their full consent history, for their data export (FR-PR-2). Besides
+     * {@link #findNotificationContact}, the only way plaintext personal data leaves this module: it must go into
+     * the user's export file and nowhere else. Empty for an unknown user.
+     */
+    Optional<PersonalDataExport> exportPersonalData(UUID userId);
+
+    /**
      * Stores the mobile number verified by minimum KYC (FR-KYC-1) on the user, encrypted, with its blind
      * index. Joins the caller's transaction, so a later failure in the KYC step rolls this back too.
      * Recording the number the user already has is a no-op.

@@ -113,6 +113,11 @@ public class TestcontainersConfiguration {
             registry.add("trustledger.kyc.storage.region", localStack::getRegion);
             registry.add("trustledger.kyc.storage.access-key", localStack::getAccessKey);
             registry.add("trustledger.kyc.storage.secret-key", localStack::getSecretKey);
+            // Data exports (FR-PR-2): same LocalStack, a bucket of their own.
+            registry.add("trustledger.privacy.storage.endpoint", () -> localStack.getEndpoint().toString());
+            registry.add("trustledger.privacy.storage.region", localStack::getRegion);
+            registry.add("trustledger.privacy.storage.access-key", localStack::getAccessKey);
+            registry.add("trustledger.privacy.storage.secret-key", localStack::getSecretKey);
         };
     }
 }

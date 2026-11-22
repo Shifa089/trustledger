@@ -1,0 +1,17 @@
+### Privacy (FR-PR-2, M10 Day 21). Fake test data only.
+# Prerequisites: run "customer1: token" in auth.http.
+
+### customer1: request a data export -> 202 {id, type EXPORT, status PENDING, requestedAt}
+# Prepared in the background (profile, consents, KYC status without documents, wallet, transfers, top-ups) as one
+# JSON file in S3 (LocalStack locally). A second request while one is PENDING -> 409 REQUEST_IN_PROGRESS.
+POST {{api}}/api/v1/me/data-export
+Authorization: Bearer {{customer1_token}}
+
+### customer1: my data requests, newest first -> 200 {items:[...]} (Cache-Control: no-store)
+# A COMPLETED export has download {url, expiresAt}: a presigned S3 link valid 10 minutes, fresh on every call.
+# Open the url in a browser (or curl it) to download trustledger-data-export.json.
+GET {{api}}/api/v1/me/data-requests
+Authorization: Bearer {{customer1_token}}
+
+### No token -> 401
+GET {{api}}/api/v1/me/data-requests

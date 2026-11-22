@@ -43,6 +43,15 @@ trustledger:
       access-key: test
       secret-key: test
       create-bucket: true
+  # Data exports (FR-PR-2): same LocalStack, a bucket of their own.
+  privacy:
+    storage:
+      bucket: trustledger-privacy-local
+      endpoint: http://localhost:4566
+      path-style: true
+      access-key: test
+      secret-key: test
+      create-bucket: true
   # Manual test page for Razorpay Checkout in test mode: http://localhost:8080/checkout.html
   # Create the contract topics on the compose broker (3 partitions, replication 1).
   events:
