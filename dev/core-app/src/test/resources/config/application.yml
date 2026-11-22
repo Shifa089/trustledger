@@ -19,6 +19,11 @@ trustledger:
   events:
     topics:
       create: true
+    # Same 3 attempts, short waits so retry tests stay fast.
+    consumer:
+      retry:
+        initial-interval: 50ms
+        max-interval: 200ms
   # WireMock stands in for Razorpay (WireMockConfiguration sets base-url to its random port). Obviously fake
   # test-format keys. Short backoff so retry tests stay fast; the rest keeps the production values.
   razorpay:

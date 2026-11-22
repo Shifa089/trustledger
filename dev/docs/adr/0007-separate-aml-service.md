@@ -1,7 +1,7 @@
 # ADR 0007: AML as a separate service with idempotent Kafka consumers
 
 - Status: Accepted
-- Date: 2026-11-21
+- Date: 2026-11-21 (consumers, DLT); amended 2026-11-22 (freeze requests, case workflow, STR export)
 - Spec: docs/SPEC.md FR-AML-1 to 4, §4 `aml` tables, §6 "Kafka", §8 M9
 
 ## Context
@@ -67,3 +67,76 @@ nothing. Facts are unique per (`event_id`, `direction`) as a second safety net, 
 - A record in a DLT needs a person: there is no automatic replay yet. Alerting on DLT traffic belongs to M12.
 - The copied security classes can drift from core-app's. Both services test them; a change to roles means changing
   both.
+
+## Amendment (2026-11-22): freeze requests, case workflow and the STR export
+
+### Freeze requests: an outbox in the AML service
+
+FR-AML-3: a HIGH alert must make core-app freeze the wallet, through `AccountFreezeRequestedV1`. The alert is raised
+by the `RuleEngine` **inside the consumer's database transaction**, while it holds the wallet's advisory lock. Sending
+straight from there with a `KafkaTemplate` was considered and rejected:
+
+| Option | Failure |
+| --- | --- |
+| Send inside the transaction | A Kafka call while holding the wallet lock (CLAUDE.md forbids remote calls under locks). If the send succeeds and the commit then fails, core-app freezes a wallet for a case that was rolled back. |
+| Send after the commit | If the send fails, `processed_events` already says the event was handled, so the Kafka retry skips it and the freeze request is lost for good: a silent gap in AML. |
+| Kafka transactions chained with the DB transaction | Still two commits ("best-effort 1PC"), the same edge cases, much more configuration. |
+| Spring Modulith's registry, as in core-app (ADR 0005) | Works, but brings Modulith's event infrastructure into a service that has no modules, for one event type. |
+
+**Decision: a small hand-written outbox, drained with a `KafkaTemplate`.**
+
+- `aml.freeze_requests` (V4): one row per HIGH alert (`alert_id` unique), written by the `RuleEngine` in the same
+  transaction as the alert. Its `id` is the message's `eventId`, fixed once.
+- `FreezeRequestRelay`, scheduled every `trustledger.aml.freeze-relay.interval` (1 s), claims pending rows with
+  `SELECT ... FOR UPDATE SKIP LOCKED` (several instances never send the same row at once; no ShedLock needed), sends
+  each one and waits for the broker's ack (`send-timeout`), then sets `published_at`. A failed send increments
+  `attempts` and ends the run; the rows stay pending.
+- The message: key = wallet ID, JSON value with a `__TypeId__` header naming the contract, `eventId` and
+  `correlationId` headers (the correlation ID of the Kafka record whose fact tipped the rule).
+- Delivery is **at least once**: a crash between the ack and the commit re-sends the row with the same `eventId`.
+- The relay holds row locks on *outbox* rows during the send. Nothing else ever waits on those rows, so this is not
+  what the "no remote calls under locks" rule is about (wallet and case rows are never locked by it).
+
+### core-app's side: an inbox
+
+`wallet.processed_events` (V18) is the wallet module's inbox. `AccountFreezeRequestedListener` (in
+`wallet.messaging`) calls `WalletApi.freezeForAml`, which, in one transaction, claims the `eventId` with
+`ON CONFLICT DO NOTHING`, locks the wallet and freezes it with source AML and reason
+`"AML case <caseId>, rule <ruleCode>"`. `WalletFrozen` is published as for an officer's freeze (notification mail
+without reason or source, and `WalletFrozenV1` back to AML).
+
+- Already FROZEN: the existing freeze stays (an officer's reason is not overwritten). CLOSED: nothing changes.
+- A redelivered request is skipped by `eventId`, **not** by wallet state: if an officer has unfrozen the wallet in
+  between, a re-sent old request does not freeze it again. A new HIGH alert (a new request) does.
+- Unknown wallet: `NOT_FOUND` rolls the claim back, is retried, then goes to the DLT for a person to look at.
+- core-app's consumer setup copies this service's: `ErrorHandlingDeserializer` limited to `com.trustledger.events`,
+  3 attempts with backoff, `<topic>.DLT`. Its dead-letter `KafkaTemplate` is deliberately **not a bean**: a
+  `KafkaTemplate` bean would switch off Boot's auto-configured one, and the outbox externalization (ADR 0005) would
+  start sending through a JSON serializer.
+
+### Case workflow
+
+OPEN → INVESTIGATING (`assign`, also used to reassign) → CLOSED_FALSE_POSITIVE (`close`) or ESCALATED (`escalate`).
+Every other step is a 409 `INVALID_STATE_TRANSITION`; a lost race on the same case is a 409 from optimistic locking.
+
+- Only the **assigned** officer finishes a case (409 `NOT_CASE_ASSIGNEE` otherwise), always with notes (stored in
+  `resolution`, never logged).
+- Closing a false positive **does not unfreeze** the wallet. Unfreezing stays a separate, deliberate officer action in
+  core-app (`/compliance/wallets/{id}/unfreeze`), with its own reason and audit trail: two systems, two decisions.
+- `assigneeId` is not checked against Keycloak: this service has no user directory. Acceptable while every caller is
+  a compliance officer; revisit with M10's audit trail.
+
+### STR export
+
+`GET /aml/cases/{id}/str-report` exists only for ESCALATED cases. One CSV table (RFC 4180, CRLF), one row per CASE,
+ALERT and FACT. Wallet, counterparty, reference and officer IDs keep only their last 4 characters, including IDs
+quoted inside alert details and notes; the case ID stays whole as the report's own reference. Cells starting with
+`= + - @`, a tab or CR get a leading `'` (CSV formula injection). Sent with `Content-Disposition: attachment` and
+`Cache-Control: no-store`. No CSV library: the writer is 40 lines and unit-tested.
+
+### Consequences
+
+- One more table and a scheduled job in the AML service; a freeze takes up to about one relay interval to leave.
+- The case list and every endpoint have an explicit security rule; `/aml/alerts` (SPEC §5) is denied until built.
+- A request stuck in the outbox (broker down) shows as `publishedAt: null` in the case detail; alerting on old
+  pending rows belongs to M12.

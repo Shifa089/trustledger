@@ -90,7 +90,8 @@ that must not leave (`WalletFrozen.userId`, `journalEntryId`). So:
   publication becomes `FAILED`) instead of blocking.
 
 core-app produces three of the four contracts (`TransferCompletedV1`, `TopupCapturedV1`, `WalletFrozenV1`).
-`AccountFreezeRequestedV1` is produced by risk-aml-service (M9), with the same pattern there.
+`AccountFreezeRequestedV1` is produced by risk-aml-service (M9) through an outbox of its own: a small hand-written
+table and relay rather than Modulith's registry (ADR 0007, amendment of 2026-11-22).
 
 **Topics.** `NewTopic` beans for all four contract topics (3 partitions, replication 1), only where
 `trustledger.events.topics.create=true`: the local profile and tests. In AWS, topics belong to the infrastructure.

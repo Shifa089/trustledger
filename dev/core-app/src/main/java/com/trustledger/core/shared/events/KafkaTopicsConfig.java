@@ -5,6 +5,7 @@ import com.trustledger.events.TopupCapturedV1;
 import com.trustledger.events.TransferCompletedV1;
 import com.trustledger.events.WalletFrozenV1;
 import java.util.List;
+import java.util.stream.Stream;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.annotation.Bean;
@@ -28,10 +29,14 @@ public class KafkaTopicsConfig {
     public static final List<String> TOPICS = List.of(TransferCompletedV1.TOPIC, TopupCapturedV1.TOPIC,
             WalletFrozenV1.TOPIC, AccountFreezeRequestedV1.TOPIC);
 
+    /** Dead-letter topics of the topics core-app consumes (M9): {@code <topic>.DLT}. */
+    public static final List<String> DEAD_LETTER_TOPICS = List.of(
+            AccountFreezeRequestedV1.TOPIC + KafkaConsumerProperties.DLT_SUFFIX);
+
     @Bean
     KafkaAdmin.NewTopics contractTopics(EventsProperties properties) {
         EventsProperties.Topics topics = properties.topics();
-        return new KafkaAdmin.NewTopics(TOPICS.stream()
+        return new KafkaAdmin.NewTopics(Stream.concat(TOPICS.stream(), DEAD_LETTER_TOPICS.stream())
                 .map(name -> TopicBuilder.name(name).partitions(topics.partitions()).replicas(topics.replicas())
                         .build())
                 .toArray(NewTopic[]::new));

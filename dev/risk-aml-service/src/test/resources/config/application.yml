@@ -17,3 +17,7 @@ trustledger:
         max-interval: 200ms
       topics:
         create: true
+    # Short relay pause, so freeze-request tests see the message quickly.
+    freeze-relay:
+      interval: 200ms
+      send-timeout: 5s

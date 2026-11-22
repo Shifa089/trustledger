@@ -4,9 +4,12 @@ import com.trustledger.aml.cases.domain.Alert;
 import com.trustledger.aml.cases.domain.AlertRepository;
 import com.trustledger.aml.cases.domain.AmlCase;
 import com.trustledger.aml.cases.domain.AmlCaseRepository;
+import com.trustledger.aml.cases.domain.FreezeRequest;
+import com.trustledger.aml.cases.domain.FreezeRequestRepository;
 import com.trustledger.aml.facts.domain.TransactionFact;
 import com.trustledger.aml.rules.domain.AlertDetails;
 import com.trustledger.aml.rules.domain.AmlRule;
+import com.trustledger.aml.rules.domain.Severity;
 import com.trustledger.aml.rules.domain.WalletEvaluationLock;
 import java.time.Clock;
 import java.time.Duration;
@@ -18,6 +21,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,24 +37,32 @@ import org.springframework.transaction.annotation.Transactional;
  * Per wallet, evaluation is serialised with {@link WalletEvaluationLock}, taken in ascending wallet ID order (a
  * transfer touches two wallets). That also makes "find the active case, or open one" safe without retries; the
  * partial unique index on {@code aml.cases} stays as the backstop.
+ * <p>
+ * FR-AML-3: a HIGH alert also writes a {@link FreezeRequest} in this same transaction (the outbox, ADR 0007). It is
+ * <b>not</b> sent from here: that would be a Kafka call while the wallet lock is held, and a send whose transaction
+ * might still roll back. {@code FreezeRequestRelay} sends it after the commit.
  */
 @Service
 public class RuleEngine {
 
     private static final Logger log = LoggerFactory.getLogger(RuleEngine.class);
+    /** Set by the Kafka listener for the record being processed (already checked to be a plain token). */
+    static final String CORRELATION_ID = "correlationId";
 
     private final List<AmlRule> rules;
     private final WalletEvaluationLock lock;
     private final AmlCaseRepository cases;
     private final AlertRepository alerts;
+    private final FreezeRequestRepository freezeRequests;
     private final Clock clock;
 
     public RuleEngine(List<AmlRule> rules, WalletEvaluationLock lock, AmlCaseRepository cases,
-            AlertRepository alerts, Clock clock) {
+            AlertRepository alerts, FreezeRequestRepository freezeRequests, Clock clock) {
         this.rules = List.copyOf(rules);
         this.lock = lock;
         this.cases = cases;
         this.alerts = alerts;
+        this.freezeRequests = freezeRequests;
         this.clock = clock;
     }
 
@@ -88,6 +100,10 @@ public class RuleEngine {
         amlCase.alertRaised(now);
         log.info("AML alert raised rule={} severity={} wallet={} case={}", rule.code(), rule.severity(), walletId,
                 amlCase.getId());
+        if (alert.getSeverity() == Severity.HIGH) {
+            FreezeRequest request = freezeRequests.save(FreezeRequest.forAlert(alert, MDC.get(CORRELATION_ID), now));
+            log.info("Freeze requested wallet={} case={} request={}", walletId, amlCase.getId(), request.getId());
+        }
         return Optional.of(RaisedAlert.of(alert));
     }
 

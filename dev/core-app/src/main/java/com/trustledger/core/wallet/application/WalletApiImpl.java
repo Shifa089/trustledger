@@ -3,6 +3,7 @@ package com.trustledger.core.wallet.application;
 import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
+import com.trustledger.core.wallet.AmlFreezeOutcome;
 import com.trustledger.core.wallet.WalletApi;
 import com.trustledger.core.wallet.WalletLimits;
 import com.trustledger.core.wallet.WalletView;
@@ -32,13 +33,22 @@ class WalletApiImpl implements WalletApi {
     private final WalletRepository wallets;
     private final WalletLocks locks;
     private final LimitsProperties limits;
+    private final WalletComplianceService compliance;
     private final Clock clock;
 
-    WalletApiImpl(WalletRepository wallets, WalletLocks locks, LimitsProperties limits, Clock clock) {
+    WalletApiImpl(WalletRepository wallets, WalletLocks locks, LimitsProperties limits,
+            WalletComplianceService compliance, Clock clock) {
         this.wallets = wallets;
         this.locks = locks;
         this.limits = limits;
+        this.compliance = compliance;
         this.clock = clock;
+    }
+
+    /** FR-AML-3: the same freeze path as an officer's, in its own transaction (not part of money movement). */
+    @Override
+    public AmlFreezeOutcome freezeForAml(UUID eventId, UUID walletId, UUID caseId, String ruleCode) {
+        return compliance.freezeForAml(eventId, walletId, caseId, ruleCode);
     }
 
     @Override

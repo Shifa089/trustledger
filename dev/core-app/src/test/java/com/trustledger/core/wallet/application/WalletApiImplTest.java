@@ -46,6 +46,9 @@ class WalletApiImplTest {
     @Mock
     WalletLocks locks;
 
+    @Mock
+    WalletComplianceService compliance;
+
     WalletApiImpl api;
 
     @BeforeEach
@@ -53,7 +56,7 @@ class WalletApiImplTest {
         LimitsProperties limits = new LimitsProperties(Money.parse("50000.00"),
                 new TierLimits(Money.parse("10000.00"), Money.parse("10000.00"), false, null),
                 new TierLimits(Money.parse("200000.00"), Money.parse("200000.00"), true, Money.parse("100000.00")));
-        api = new WalletApiImpl(wallets, locks, limits, Clock.fixed(NOW, ZoneOffset.UTC));
+        api = new WalletApiImpl(wallets, locks, limits, compliance, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static Wallet wallet(WalletTier tier, long balanceMinor) {

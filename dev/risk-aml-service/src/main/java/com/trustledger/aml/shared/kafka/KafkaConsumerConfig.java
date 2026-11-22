@@ -1,5 +1,6 @@
 package com.trustledger.aml.shared.kafka;
 
+import com.trustledger.events.AccountFreezeRequestedV1;
 import com.trustledger.events.TopupCapturedV1;
 import com.trustledger.events.TransferCompletedV1;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -67,7 +69,8 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
-    DeadLetterPublishingRecoverer deadLetterRecoverer(KafkaTemplate<String, Object> deadLetterTemplate) {
+    DeadLetterPublishingRecoverer deadLetterRecoverer(
+            @Qualifier("deadLetterTemplate") KafkaTemplate<String, Object> deadLetterTemplate) {
         return new DeadLetterPublishingRecoverer(deadLetterTemplate,
                 (record, exception) -> new TopicPartition(record.topic() + AmlKafkaProperties.DLT_SUFFIX, -1));
     }
@@ -93,8 +96,23 @@ public class KafkaConsumerConfig {
     }
 
     /**
+     * Producer for {@code AccountFreezeRequestedV1} (FR-AML-3), used by the freeze-request relay. JSON with a
+     * {@code __TypeId__} header naming the contract record, as core-app's outbox writes its contracts, so core-app's
+     * consumer reads it with the same deserializer setup as this service's. Connection settings (acks=all,
+     * idempotence, bounded timeouts) come from Boot's producer factory.
+     */
+    @Bean
+    KafkaTemplate<String, Object> freezeRequestTemplate(ProducerFactory<?, ?> bootProducerFactory) {
+        JacksonJsonSerializer<Object> json = new JacksonJsonSerializer<>();
+        json.setAddTypeInfo(true);
+        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(bootProducerFactory.getConfigurationProperties(),
+                new StringSerializer(), json));
+    }
+
+    /**
      * Local and test only. The consumed topics belong to core-app, which creates them with the same settings
-     * (creating an existing topic is a no-op); creating them here as well lets this service start first.
+     * (creating an existing topic is a no-op); creating them here as well lets this service start first. The same
+     * goes for the produced topic, {@link AccountFreezeRequestedV1#TOPIC}; its dead-letter topic is core-app's.
      */
     @Bean
     @ConditionalOnProperty(name = "trustledger.aml.kafka.topics.create", havingValue = "true")
@@ -106,6 +124,8 @@ public class KafkaConsumerConfig {
                 all.add(TopicBuilder.name(name).partitions(topics.partitions()).replicas(topics.replicas()).build());
             }
         }
+        all.add(TopicBuilder.name(AccountFreezeRequestedV1.TOPIC).partitions(topics.partitions())
+                .replicas(topics.replicas()).build());
         return new KafkaAdmin.NewTopics(all.toArray(NewTopic[]::new));
     }
 }

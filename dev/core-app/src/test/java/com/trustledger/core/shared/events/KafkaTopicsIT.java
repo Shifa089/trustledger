@@ -35,4 +35,13 @@ class KafkaTopicsIT {
             });
         }
     }
+
+    @Test
+    void theDeadLetterTopicOfEachConsumedTopicIsCreated() throws Exception {
+        try (Admin admin = Admin.create(Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
+                kafka.getBootstrapServers()))) {
+            assertThat(admin.describeTopics(KafkaTopicsConfig.DEAD_LETTER_TOPICS).allTopicNames().get())
+                    .containsOnlyKeys("trustledger.aml.account-freeze-requested.v1.DLT");
+        }
+    }
 }
