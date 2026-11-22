@@ -18,6 +18,7 @@ import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.timelimiter.TimeLimiter;
 import io.github.resilience4j.timelimiter.TimeLimiterConfig;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.http.HttpClient;
@@ -176,7 +177,12 @@ class RazorpayGatewayAdapter implements PaymentGateway, AutoCloseable {
         return keyId;
     }
 
-    /** For tests and, later, the health indicator and metrics (M12). */
+    /** Registers the circuit-breaker state gauge (M12). */
+    void registerMetrics(MeterRegistry meters) {
+        CircuitBreakerStateGauge.register(meters, circuitBreaker);
+    }
+
+    /** For tests; the same state is the {@link CircuitBreakerStateGauge} metric. */
     CircuitBreaker.State circuitState() {
         return circuitBreaker.getState();
     }

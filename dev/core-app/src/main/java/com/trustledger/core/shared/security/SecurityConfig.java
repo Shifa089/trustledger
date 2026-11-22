@@ -109,7 +109,8 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         // Public: HMAC-verified by the webhook controller (FR-P-5), and health probes.
                         .requestMatchers("/api/*/webhooks/**").permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/liveness",
+                                "/actuator/health/readiness").permitAll()
                         // More specific than /admin/** below, so it must come first (SPEC §5).
                         .requestMatchers(HttpMethod.GET, "/api/*/admin/ledger/accounts/*/balance")
                                 .hasAnyRole(ADMIN, AUDITOR)

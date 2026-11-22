@@ -58,10 +58,11 @@ public class RuleEngine {
     private final FreezeRequestRepository freezeRequests;
     private final CaseEventRepository caseEvents;
     private final Clock clock;
+    private final AmlAlertMetrics metrics;
 
     public RuleEngine(List<AmlRule> rules, WalletEvaluationLock lock, AmlCaseRepository cases,
             AlertRepository alerts, FreezeRequestRepository freezeRequests, CaseEventRepository caseEvents,
-            Clock clock) {
+            Clock clock, AmlAlertMetrics metrics) {
         this.rules = List.copyOf(rules);
         this.lock = lock;
         this.cases = cases;
@@ -69,6 +70,7 @@ public class RuleEngine {
         this.freezeRequests = freezeRequests;
         this.caseEvents = caseEvents;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     /**
@@ -103,6 +105,7 @@ public class RuleEngine {
                 .orElseGet(() -> openCase(walletId, now));
         Alert alert = alerts.save(Alert.raise(amlCase, rule.code(), rule.severity(), details.description(), now));
         amlCase.alertRaised(now);
+        metrics.alertRaised(rule.code(), rule.severity().name());
         log.info("AML alert raised rule={} severity={} wallet={} case={}", rule.code(), rule.severity(), walletId,
                 amlCase.getId());
         if (alert.getSeverity() == Severity.HIGH) {

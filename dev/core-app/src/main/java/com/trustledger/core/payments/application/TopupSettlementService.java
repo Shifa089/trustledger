@@ -53,15 +53,17 @@ public class TopupSettlementService {
     private final TopupLimitChecker limits;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final PaymentsMetrics metrics;
 
     TopupSettlementService(TopupRepository topups, WalletApi wallets, LedgerApi ledger, TopupLimitChecker limits,
-            ApplicationEventPublisher events, Clock clock) {
+            ApplicationEventPublisher events, Clock clock, PaymentsMetrics metrics) {
         this.topups = topups;
         this.wallets = wallets;
         this.ledger = ledger;
         this.limits = limits;
         this.events = events;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     /**
@@ -117,6 +119,7 @@ public class TopupSettlementService {
             topups.saveAndFlush(topup);
             log.warn("Top-up {} parked in suspense ({}), payment {}, journal entry {}{}", topup.getId(),
                     refusal.get(), payment.paymentId(), entryId, late ? " (late capture)" : "");
+            metrics.topup(TopupStatus.PARKED);
             return SettlementOutcome.PARKED;
         }
 
@@ -128,6 +131,7 @@ public class TopupSettlementService {
                 EventMetadata.capture(clock)));
         log.info("Top-up {} captured, payment {}, journal entry {}{}", topup.getId(), payment.paymentId(), entryId,
                 late ? " (late capture)" : "");
+        metrics.topup(TopupStatus.CAPTURED);
         return SettlementOutcome.CAPTURED;
     }
 
@@ -152,6 +156,7 @@ public class TopupSettlementService {
         topup.fail(clock.instant());
         topups.saveAndFlush(topup);
         log.info("Top-up {} failed, payment {} ({})", topup.getId(), payment.paymentId(), payment.errorCode());
+        metrics.topup(TopupStatus.FAILED);
         return SettlementOutcome.FAILED;
     }
 
@@ -167,6 +172,7 @@ public class TopupSettlementService {
         topup.expire(clock.instant());
         topups.saveAndFlush(topup);
         log.info("Top-up {} expired", topup.getId());
+        metrics.topup(TopupStatus.EXPIRED);
         return SettlementOutcome.EXPIRED;
     }
 

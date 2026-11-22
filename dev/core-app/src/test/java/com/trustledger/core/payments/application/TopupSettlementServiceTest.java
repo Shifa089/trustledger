@@ -28,6 +28,7 @@ import com.trustledger.core.wallet.WalletLimits;
 import com.trustledger.core.wallet.WalletStatus;
 import com.trustledger.core.wallet.WalletTier;
 import com.trustledger.core.wallet.WalletView;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -61,7 +62,7 @@ class TopupSettlementServiceTest {
     private final TopupLimitChecker limits = mock(TopupLimitChecker.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final TopupSettlementService service = new TopupSettlementService(topups, wallets, ledger, limits,
-            events, Clock.fixed(NOW, ZoneOffset.UTC));
+            events, Clock.fixed(NOW, ZoneOffset.UTC), new PaymentsMetrics(new SimpleMeterRegistry()));
 
     private final WalletView wallet = new WalletView(WALLET, UUID.randomUUID(), WalletTier.MIN, WalletStatus.ACTIVE,
             Money.zero(Money.INR), Money.zero(Money.INR), Money.zero(Money.INR));

@@ -30,6 +30,7 @@ import com.trustledger.core.wallet.WalletLimits;
 import com.trustledger.core.wallet.WalletStatus;
 import com.trustledger.core.wallet.WalletTier;
 import com.trustledger.core.wallet.WalletView;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -100,8 +101,9 @@ class TransferEventsTest {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         // The real hold path on the same mocks, so the hold test still sees wallets.hold and no posting.
         HeldTransferService held = new HeldTransferService(wallets, ledger, limits, transfers, events, clock,
-                new PagingProperties(20, 100));
-        service = new TransferService(wallets, ledger, limits, recipients, transfers, held, events, clock);
+                new PagingProperties(20, 100), new PaymentsMetrics(new SimpleMeterRegistry()));
+        service = new TransferService(wallets, ledger, limits, recipients, transfers, held, events, clock,
+                new PaymentsMetrics(new SimpleMeterRegistry()));
         when(wallets.findByUser(SENDER_USER)).thenReturn(Optional.of(view(SENDER, WalletStatus.ACTIVE, 0)));
         when(recipients.resolve(eq(SENDER), any())).thenReturn(view(RECEIVER, WalletStatus.ACTIVE, 0));
         lockedAs(WalletStatus.ACTIVE, WalletStatus.ACTIVE);

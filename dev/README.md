@@ -124,6 +124,26 @@ the Kafka send and risk-aml-service's consumer span are in the same trace. **Lok
 each line carries `trace_id`/`span_id` and links to its trace. Without `obs`, tracing still runs (trace and span IDs
 on every console line) but nothing is exported.
 
+**Dashboard:** Grafana → Dashboards → folder *TrustLedger* → **TrustLedger overview**
+(http://localhost:3000/d/trustledger-overview). It is provisioned from
+[infra/grafana/trustledger-dashboard.json](infra/grafana/trustledger-dashboard.json); edit that file, not the UI, and
+Grafana reloads it within 30 s. Metrics arrive every 15 s, so a new panel value can take up to half a minute.
+
+| Panel | Prometheus metric | Meaning |
+| --- | --- | --- |
+| Request rate, error rate | `http_server_requests_seconds_count` | per service; error rate split into 5xx and 4xx |
+| p95 / p99 latency per endpoint | `http_server_requests_seconds_bucket` | per method and URI template |
+| Transfers by status | `trustledger_transfers_total{status}` | state changes: COMPLETED, HELD_FOR_REVIEW, then COMPLETED/REJECTED on review, FAILED when refused |
+| Transfer amount distribution | `trustledger_transfer_amount_bucket` | rupee buckets; 45k–50k is AML rule R2's band, 1L rule R3's |
+| Top-ups by status | `trustledger_topups_total{status}` | PENDING, CAPTURED, PARKED, FAILED, EXPIRED |
+| Payment gateway circuit | `trustledger_gateway_circuit_state{name,state}` | Razorpay circuit breaker: CLOSED, HALF_OPEN, OPEN |
+| AML alerts by rule | `trustledger_aml_alerts_total{rule}` | from risk-aml-service: R1 velocity, R2 structuring, R3 large amount, R4 fan-out |
+| Reconciliation mismatches | `trustledger_reconciliation_mismatches_total{reason}` | anything above 0 is a bug (FR-L-4) |
+
+**Actuator** (both apps): `/actuator/health`, `/actuator/health/liveness` and `/actuator/health/readiness` are public
+and show only the status. Health components, `/actuator/metrics` and `/actuator/info` need an ADMIN token; everything
+else under `/actuator` is not exposed.
+
 ### Try the money path
 
 IntelliJ HTTP Client files in [http/](http/) (environment `local`), in this order:

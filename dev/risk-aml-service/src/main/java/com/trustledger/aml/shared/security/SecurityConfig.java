@@ -93,7 +93,8 @@ public class SecurityConfig {
                 .requestCache(cache -> cache.disable())
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/liveness",
+                                "/actuator/health/readiness").permitAll()
                         // FR-AML-4 case workflow: one rule per endpoint, so a new endpoint is refused until it
                         // gets its own (and a row in AmlSecurityIT).
                         .requestMatchers(HttpMethod.GET, "/api/*/aml/cases", "/api/*/aml/cases/*",

@@ -27,6 +27,7 @@ import com.trustledger.core.wallet.WalletLimits;
 import com.trustledger.core.wallet.WalletStatus;
 import com.trustledger.core.wallet.WalletTier;
 import com.trustledger.core.wallet.WalletView;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -95,7 +96,7 @@ class HeldTransferServiceTest {
     @BeforeEach
     void setUp() {
         service = new HeldTransferService(wallets, ledger, limits, transfers, events, Clock.fixed(NOW,
-                ZoneOffset.UTC), new PagingProperties(20, 100));
+                ZoneOffset.UTC), new PagingProperties(20, 100), new PaymentsMetrics(new SimpleMeterRegistry()));
         transfer = Transfer.initiate(SENDER, RECEIVER, AMOUNT, "Rent", CREATED);
         ReflectionTestUtils.setField(transfer, "id", TRANSFER_ID);
         transfer.holdForReview(CREATED);

@@ -120,6 +120,42 @@ class AmlSecurityIT {
         mvc.perform(get("/actuator").with(token("ADMIN"))).andExpect(status().isOk());
     }
 
+    // --- M12 actuator: probes public, health details and metrics ADMIN only -------------------------------------
+
+    @Test
+    void livenessAndReadinessProbesArePublicAndUp() throws Exception {
+        mvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+        mvc.perform(get("/actuator/health/readiness")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.components").doesNotExist());
+    }
+
+    @Test
+    void healthComponentsAreShownOnlyToAnAdmin() throws Exception {
+        mvc.perform(get("/actuator/health")).andExpect(jsonPath("$.components").doesNotExist());
+        mvc.perform(get("/actuator/health").with(token("COMPLIANCE_OFFICER")))
+                .andExpect(jsonPath("$.components").doesNotExist());
+        mvc.perform(get("/actuator/health").with(token("ADMIN"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.db.status").value("UP"));
+        mvc.perform(get("/actuator/health/db")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/actuator/health/readiness").with(token("ADMIN")))
+                .andExpect(jsonPath("$.components.db.status").value("UP"));
+    }
+
+    @Test
+    void metricsAreAdminOnlyAndListTheAlertCounter() throws Exception {
+        mvc.perform(get("/actuator/metrics")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/actuator/metrics").with(token("COMPLIANCE_OFFICER"))).andExpect(status().isForbidden());
+        mvc.perform(get("/actuator/metrics").with(token("ADMIN"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.names", Matchers.hasItem("trustledger.aml.alerts")));
+        mvc.perform(get("/actuator/metrics/trustledger.aml.alerts").with(token("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.availableTags[?(@.tag == 'rule')].values[*]",
+                        Matchers.hasItems("R1", "R2", "R3", "R4")));
+        mvc.perform(get("/actuator/env").with(token("ADMIN"))).andExpect(status().isNotFound());
+    }
+
     @Test
     void securityHeadersAreSet() throws Exception {
         mvc.perform(get("/actuator/health"))
