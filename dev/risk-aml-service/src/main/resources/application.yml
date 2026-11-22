@@ -4,6 +4,10 @@ spring:
   threads:
     virtual:
       enabled: true
+  # Trace context (and the MDC) follows @Async work (M12, ADR 0020).
+  task:
+    execution:
+      propagate-context: true
   # Own schema "aml" (SPEC §4), own migrations and own history table (aml.flyway_schema_history), so this service
   # and core-app can share one PostgreSQL locally without touching each other's tables (ADR 0007).
   flyway:
@@ -22,7 +26,14 @@ spring:
   # for the error handler (straight to <topic>.DLT) instead of failing the poll loop forever. Only classes in the
   # event-contracts package may be built from a message. Offsets are committed after the listener returns, i.e.
   # after the database transaction: a crash in between redelivers, and processed_events skips the repeat.
+  #
+  # Observation on (M12): listeners continue the trace from the W3C traceparent header; producers write it.
+  # KafkaConsumerConfig turns it on for the templates it builds itself.
   kafka:
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
     consumer:
       group-id: risk-aml-service
       auto-offset-reset: earliest
@@ -49,6 +60,21 @@ spring:
 
 server:
   port: 8081
+
+# Observability (M12, ADR 0020): same as core-app. Tracing always on; OTLP export only with the "obs" profile.
+management:
+  tracing:
+    export:
+      otlp:
+        enabled: false
+  logging:
+    export:
+      otlp:
+        enabled: false
+  otlp:
+    metrics:
+      export:
+        enabled: false
 
 logging:
   level:

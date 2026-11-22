@@ -4,6 +4,10 @@ spring:
   threads:
     virtual:
       enabled: true
+  # Trace context (and the MDC) follows @Async work, e.g. the outbox's Kafka send after commit (M12, ADR 0020).
+  task:
+    execution:
+      propagate-context: true
   # Slightly above the 5 MB document limit, so the service's exact check (and its 413 ProblemDetail)
   # decides; anything bigger is cut off by the container before it is read into memory.
   servlet:
@@ -39,7 +43,14 @@ spring:
   # error handler (straight to <topic>.DLT) instead of failing the poll loop forever. Only event-contracts classes
   # may be built from a message (__TypeId__ header). Offsets are committed after the listener returns, i.e. after
   # the freeze transaction: a crash in between redelivers, and wallet.processed_events skips the repeat.
+  #
+  # Observation on (M12): the producer writes a W3C traceparent header and the listener continues that trace.
+  # Covers Boot's template and listener factory; KafkaConsumerConfig turns it on for its own template.
   kafka:
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
     consumer:
       group-id: core-app
       auto-offset-reset: earliest
@@ -79,6 +90,23 @@ spring:
 
 server:
   port: 8080
+
+# Observability (M12, ADR 0020). Tracing is always on, so every log line has traceId/spanId and Kafka records carry
+# traceparent. Sending to an OTLP collector is off here; the "obs" profile (application-obs.yml) turns it on, so a
+# plain local run without the LGTM container logs no export errors.
+management:
+  tracing:
+    export:
+      otlp:
+        enabled: false
+  logging:
+    export:
+      otlp:
+        enabled: false
+  otlp:
+    metrics:
+      export:
+        enabled: false
 
 # Kafka clients log their whole configuration at INFO on every start; warnings and errors are enough.
 logging:

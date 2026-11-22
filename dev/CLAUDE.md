@@ -16,7 +16,7 @@ Full spec: docs/SPEC.md. Read the relevant section before every task.
 ## Stack
 Java 25, Spring Boot 4.x, Spring Security 7 (OAuth2 resource server, Keycloak),
 Spring Data JPA + PostgreSQL + Flyway, Spring Modulith, Kafka, Redis, Resilience4j,
-Bucket4j, Lombok (entities only), springdoc-openapi (ADR 0010), AWS SDK v2 S3 (ADR 0011), ShedLock (ADR 0013), Spring Mail (ADR 0017), AspectJ via spring-boot-starter-aspectj (ADR 0018), Spring Cache on Redis via spring-boot-starter-cache (ADR 0019; never balances), Testcontainers, WireMock (ADR 0014), ArchUnit (ADR 0015),
+Bucket4j, Lombok (entities only), springdoc-openapi (ADR 0010), AWS SDK v2 S3 (ADR 0011), ShedLock (ADR 0013), Spring Mail (ADR 0017), AspectJ via spring-boot-starter-aspectj (ADR 0018), Spring Cache on Redis via spring-boot-starter-cache (ADR 0019; never balances), OpenTelemetry over OTLP via spring-boot-starter-opentelemetry + opentelemetry-logback-appender (ADR 0020), Testcontainers, WireMock (ADR 0014), ArchUnit (ADR 0015),
 JUnit, Mockito, AssertJ.
 
 ## Architecture rules (never break)

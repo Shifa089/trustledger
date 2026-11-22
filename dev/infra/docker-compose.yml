@@ -119,7 +119,9 @@ services:
       start_period: 15s
     restart: unless-stopped
 
-  # Observability (profile "obs"): placeholder, wired up on Day 23 (M12).
+  # Observability (profile "obs", M12, ADR 0020): Grafana + Prometheus-compatible metrics + Loki + Tempo in one
+  # container, receiving OTLP from both apps when they run with the Spring profile "obs" (-Dspring-boot.run.profiles=local,obs).
+  # Grafana: http://localhost:3000 (anonymous admin, local only).
   lgtm:
     image: grafana/otel-lgtm:0.40.0
     profiles: ["obs"]

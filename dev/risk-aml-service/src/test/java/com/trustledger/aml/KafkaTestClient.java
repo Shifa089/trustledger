@@ -45,15 +45,26 @@ public final class KafkaTestClient implements AutoCloseable {
 
     /** A contract record as core-app sends it. */
     public void sendContract(String topic, String key, Record contract, UUID eventId) {
-        send(topic, key, JSON.writeValueAsBytes(contract), contract.getClass().getName(), eventId);
+        sendContract(topic, key, contract, eventId, Map.of());
+    }
+
+    /** A contract record as core-app sends it, plus extra headers (e.g. the W3C {@code traceparent}). */
+    public void sendContract(String topic, String key, Record contract, UUID eventId, Map<String, String> headers) {
+        send(topic, key, JSON.writeValueAsBytes(contract), contract.getClass().getName(), eventId, headers);
     }
 
     /** Raw bytes with the given type header: for records core-app would never send. */
     public void send(String topic, String key, byte[] value, String typeId, UUID eventId) {
+        send(topic, key, value, typeId, eventId, Map.of());
+    }
+
+    private void send(String topic, String key, byte[] value, String typeId, UUID eventId,
+            Map<String, String> headers) {
         ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, key, value);
         record.headers().add(TYPE_ID_HEADER, typeId.getBytes(StandardCharsets.UTF_8));
         record.headers().add("eventId", eventId.toString().getBytes(StandardCharsets.UTF_8));
         record.headers().add("correlationId", UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8));
+        headers.forEach((name, headerValue) -> record.headers().add(name, headerValue.getBytes(StandardCharsets.UTF_8)));
         try {
             producer.send(record).get();
         } catch (Exception e) {

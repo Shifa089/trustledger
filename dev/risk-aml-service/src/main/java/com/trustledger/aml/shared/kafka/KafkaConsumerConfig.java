@@ -4,6 +4,7 @@ import com.trustledger.events.AccountFreezeRequestedV1;
 import com.trustledger.events.AmlCaseStatusChangedV1;
 import com.trustledger.events.TopupCapturedV1;
 import com.trustledger.events.TransferCompletedV1;
+import io.micrometer.observation.ObservationRegistry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -86,14 +87,16 @@ public class KafkaConsumerConfig {
      * {@code spring.kafka.*}.
      */
     @Bean
-    KafkaTemplate<String, Object> deadLetterTemplate(ProducerFactory<?, ?> bootProducerFactory) {
+    KafkaTemplate<String, Object> deadLetterTemplate(ProducerFactory<?, ?> bootProducerFactory,
+            ObservationRegistry observationRegistry) {
         JacksonJsonSerializer<Object> json = new JacksonJsonSerializer<>();
         json.setAddTypeInfo(false);
         Map<Class<?>, Serializer<?>> byType = new LinkedHashMap<>();
         byType.put(byte[].class, new ByteArraySerializer());
         byType.put(Object.class, json);
-        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(bootProducerFactory.getConfigurationProperties(),
-                new StringSerializer(), new DelegatingByTypeSerializer(byType, true)));
+        return observed(new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(
+                bootProducerFactory.getConfigurationProperties(), new StringSerializer(),
+                new DelegatingByTypeSerializer(byType, true))), observationRegistry);
     }
 
     /**
@@ -103,11 +106,25 @@ public class KafkaConsumerConfig {
      * idempotence, bounded timeouts) come from Boot's producer factory.
      */
     @Bean
-    KafkaTemplate<String, Object> freezeRequestTemplate(ProducerFactory<?, ?> bootProducerFactory) {
+    KafkaTemplate<String, Object> freezeRequestTemplate(ProducerFactory<?, ?> bootProducerFactory,
+            ObservationRegistry observationRegistry) {
         JacksonJsonSerializer<Object> json = new JacksonJsonSerializer<>();
         json.setAddTypeInfo(true);
-        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(bootProducerFactory.getConfigurationProperties(),
-                new StringSerializer(), json));
+        return observed(new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(
+                bootProducerFactory.getConfigurationProperties(), new StringSerializer(), json)), observationRegistry);
+    }
+
+    /**
+     * Observation on (M12): every send gets a producer span and a W3C {@code traceparent} header.
+     * {@code spring.kafka.template.observation-enabled} only reaches Boot's own template, not the ones built here. A
+     * dead letter is sent while the listener's span is current, so it continues the failed record's trace. The
+     * relays run on a schedule and start a new trace per batch (the outbox row keeps no trace context).
+     */
+    static KafkaTemplate<String, Object> observed(KafkaTemplate<String, Object> template,
+            ObservationRegistry observationRegistry) {
+        template.setObservationEnabled(true);
+        template.setObservationRegistry(observationRegistry);
+        return template;
     }
 
     /**
