@@ -232,6 +232,26 @@ public class Wallet {
         return open;
     }
 
+    /**
+     * ACTIVE -> CLOSED, for the owner's erasure (FR-PR-2). Only an empty wallet closes: money is never left behind on
+     * a wallet nobody can use, so a balance (or a hold) is refused with {@link ErrorCode#WALLET_NOT_EMPTY}. A FROZEN
+     * wallet is under a compliance hold and stays as it is ({@link ErrorCode#WALLET_FROZEN}). Closing a CLOSED wallet
+     * is refused like any other step on it.
+     */
+    public void close(Instant now) {
+        requireNotClosed("close");
+        if (status == WalletStatus.FROZEN) {
+            throw new TrustLedgerException(ErrorCode.WALLET_FROZEN,
+                    "The wallet is frozen; it can't be closed until compliance has finished its review.");
+        }
+        if (balanceMinor != 0 || heldMinor != 0) {
+            throw new TrustLedgerException(ErrorCode.WALLET_NOT_EMPTY,
+                    "The wallet still holds " + balance().toDecimalString() + " INR. Transfer or spend it first.");
+        }
+        this.status = WalletStatus.CLOSED;
+        touch(now);
+    }
+
     /** The freeze in force, if the wallet is frozen. */
     public Optional<WalletFreeze> currentFreeze() {
         return freezes.stream().filter(WalletFreeze::isOpen).findFirst();

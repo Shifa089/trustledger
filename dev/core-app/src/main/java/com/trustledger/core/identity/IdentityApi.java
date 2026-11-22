@@ -33,6 +33,24 @@ public interface IdentityApi {
     Optional<NotificationContact> findNotificationContact(UUID userId);
 
     /**
+     * The user's own profile in clear plus their full consent history, for their data export (FR-PR-2). Besides
+     * {@link #findNotificationContact}, the only way plaintext personal data leaves this module: it must go into
+     * the user's export file and nowhere else. Empty for an unknown user.
+     */
+    Optional<PersonalDataExport> exportPersonalData(UUID userId);
+
+    /**
+     * FR-PR-2 erasure: removes the user's e-mail, phone and name with their blind indexes, blanks the IP address on
+     * their consent records and marks them ERASED. The user ID stays valid (ledger, transfers and audit events refer
+     * to it). Joins the caller's transaction ({@code MANDATORY}), so it commits or rolls back with the rest of the
+     * erasure.
+     *
+     * @throws com.trustledger.core.shared.TrustLedgerException {@code NOT_FOUND} for an unknown user;
+     *         {@code INVALID_STATE_TRANSITION} if the user is already erased
+     */
+    void erasePersonalData(UUID userId);
+
+    /**
      * Stores the mobile number verified by minimum KYC (FR-KYC-1) on the user, encrypted, with its blind
      * index. Joins the caller's transaction, so a later failure in the KYC step rolls this back too.
      * Recording the number the user already has is a no-op.

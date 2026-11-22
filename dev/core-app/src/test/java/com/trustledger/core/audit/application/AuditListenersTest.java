@@ -84,7 +84,7 @@ class AuditListenersTest {
         Method[] handlers = Arrays.stream(AuditListeners.class.getDeclaredMethods())
                 .filter(m -> m.getName().equals("on")).toArray(Method[]::new);
 
-        assertThat(handlers).hasSize(6).allSatisfy(m -> {
+        assertThat(handlers).hasSize(7).allSatisfy(m -> {
             TransactionalEventListener listener = m.getAnnotation(TransactionalEventListener.class);
             assertThat(listener).isNotNull();
             assertThat(listener.phase()).isEqualTo(TransactionPhase.BEFORE_COMMIT);

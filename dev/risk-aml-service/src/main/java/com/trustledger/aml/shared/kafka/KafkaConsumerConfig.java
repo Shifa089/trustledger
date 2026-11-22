@@ -1,6 +1,7 @@
 package com.trustledger.aml.shared.kafka;
 
 import com.trustledger.events.AccountFreezeRequestedV1;
+import com.trustledger.events.AmlCaseStatusChangedV1;
 import com.trustledger.events.TopupCapturedV1;
 import com.trustledger.events.TransferCompletedV1;
 import java.util.ArrayList;

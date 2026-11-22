@@ -3,7 +3,9 @@
  * (behind the {@code DocumentStorage} port, ADR 0011), the KYC case state machine with maker-checker approval
  * by compliance officers, and the {@link com.trustledger.core.kyc.KycLevelUpgraded} event.
  * <p>
- * Public API: {@link com.trustledger.core.kyc.KycLevel} and {@link com.trustledger.core.kyc.KycLevelUpgraded}.
+ * Public API: {@link com.trustledger.core.kyc.KycApi} (a user's KYC status without documents or personal data, for
+ * the data export, FR-PR-2), {@link com.trustledger.core.kyc.KycStatusSummary},
+ * {@link com.trustledger.core.kyc.KycLevel} and {@link com.trustledger.core.kyc.KycLevelUpgraded}.
  * Everything in sub-packages is internal.
  */
 package com.trustledger.core.kyc;

@@ -22,12 +22,16 @@ public class KycQueryService {
     @Transactional(readOnly = true)
     public KycOverview overview(UUID userId) {
         List<KycCase> all = cases.findByUserIdOrderByCreatedAtAsc(userId);
-        String level = all.stream()
+        return new KycOverview(currentLevel(all), all.stream().map(KycCaseView::of).toList());
+    }
+
+    /** The highest approved level among the cases, or {@code NONE}. */
+    static String currentLevel(List<KycCase> all) {
+        return all.stream()
                 .filter(KycCase::isApproved)
                 .map(KycCase::getLevel)
                 .max(Comparator.naturalOrder()) // FULL > MIN (enum order)
                 .map(KycLevel::name)
                 .orElse(KycOverview.NONE);
-        return new KycOverview(level, all.stream().map(KycCaseView::of).toList());
     }
 }

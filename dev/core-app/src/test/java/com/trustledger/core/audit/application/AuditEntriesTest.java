@@ -9,6 +9,7 @@ import com.trustledger.core.kyc.KycLevel;
 import com.trustledger.core.kyc.KycLevelUpgraded;
 import com.trustledger.core.payments.TopupCaptured;
 import com.trustledger.core.payments.TransferCompleted;
+import com.trustledger.core.privacy.PersonalDataErased;
 import com.trustledger.core.shared.EventMetadata;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.wallet.FreezeSource;
@@ -60,6 +61,19 @@ class AuditEntriesTest {
         is(entry, AuditAction.WALLET_FROZEN, AuditEntityType.WALLET, a);
         assertThat(entry.before()).isEqualTo(Map.of("status", "ACTIVE"));
         assertThat(entry.after()).isEqualTo(Map.of("status", "FROZEN", "freezeSource", "AML"));
+    }
+
+    @Test
+    void personalDataErasedCarriesIdsAndStatesOnly() {
+        UUID request = UUID.randomUUID();
+        AuditEntry withWallet = AuditEntries.of(new PersonalDataErased(a, request, b, Instant.EPOCH));
+        AuditEntry withoutWallet = AuditEntries.of(new PersonalDataErased(a, request, null, Instant.EPOCH));
+
+        is(withWallet, AuditAction.PERSONAL_DATA_ERASED, AuditEntityType.USER, a);
+        assertThat(withWallet.before()).isEqualTo(Map.of("status", "ACTIVE"));
+        assertThat(withWallet.after()).isEqualTo(Map.of("status", "ERASED", "dataRequestId", request.toString(),
+                "walletId", b.toString(), "walletStatus", "CLOSED"));
+        assertThat(withoutWallet.after()).isEqualTo(Map.of("status", "ERASED", "dataRequestId", request.toString()));
     }
 
     @Test

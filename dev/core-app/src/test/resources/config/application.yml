@@ -40,6 +40,11 @@ trustledger:
       bucket: trustledger-kyc-test
       path-style: true
       create-bucket: true
+  privacy:
+    storage:
+      bucket: trustledger-privacy-test
+      path-style: true
+      create-bucket: true
 
 # Mailpit comes from TestcontainersConfiguration (host and port). Short SMTP timeouts, so the "mail server down"
 # test (Mailpit paused) fails its send in seconds.

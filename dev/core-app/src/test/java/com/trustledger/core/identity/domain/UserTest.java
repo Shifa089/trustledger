@@ -2,6 +2,7 @@ package com.trustledger.core.identity.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
@@ -85,5 +86,34 @@ class UserTest {
         User user = User.provision("sub-1", null, null, null, NOW);
 
         assertThatIllegalArgumentException().isThrownBy(() -> user.changePhone("9876543210", null, NOW));
+    }
+
+    @Test
+    void eraseRemovesEveryPersonalFieldAndBlindIndexButKeepsTheRowIdentity() {
+        User user = User.provision("sub-1", "c1@example.test", HASH, "Test Customer One", NOW);
+        user.changePhone("9876543210", "b".repeat(64), NOW);
+        Instant later = NOW.plusSeconds(60);
+
+        user.erase(later);
+
+        assertThat(user.getStatus()).isEqualTo(UserStatus.ERASED);
+        assertThat(user.isActive()).isFalse();
+        assertThat(user.getEmail()).isNull();
+        assertThat(user.getEmailHash()).isNull();
+        assertThat(user.getPhone()).isNull();
+        assertThat(user.getPhoneHash()).isNull();
+        assertThat(user.getFullName()).isNull();
+        assertThat(user.getKeycloakSubject()).isEqualTo("sub-1");
+        assertThat(user.getCreatedAt()).isEqualTo(NOW);
+        assertThat(user.getUpdatedAt()).isEqualTo(later);
+    }
+
+    @Test
+    void anErasedUserCantBeErasedAgainOrGetAPhone() {
+        User user = User.provision("sub-1", null, null, null, NOW);
+        user.erase(NOW);
+
+        assertThatIllegalStateException().isThrownBy(() -> user.erase(NOW));
+        assertThatIllegalStateException().isThrownBy(() -> user.changePhone("9876543210", HASH, NOW));
     }
 }

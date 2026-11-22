@@ -6,6 +6,7 @@ import com.trustledger.core.audit.domain.AuditEntry;
 import com.trustledger.core.kyc.KycLevelUpgraded;
 import com.trustledger.core.payments.TopupCaptured;
 import com.trustledger.core.payments.TransferCompleted;
+import com.trustledger.core.privacy.PersonalDataErased;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.wallet.WalletCreated;
 import com.trustledger.core.wallet.WalletFrozen;
@@ -63,6 +64,19 @@ final class AuditEntries {
         after.put("journalEntryId", event.journalEntryId().toString());
         return new AuditEntry(AuditAction.TRANSFER_COMPLETED, AuditEntityType.TRANSFER, event.transferId(), null,
                 after);
+    }
+
+    /** Only IDs and states: the erased data is gone, and the audit trail must not become a copy of it. */
+    static AuditEntry of(PersonalDataErased event) {
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("status", "ERASED");
+        after.put("dataRequestId", event.dataRequestId().toString());
+        if (event.walletId() != null) {
+            after.put("walletId", event.walletId().toString());
+            after.put("walletStatus", WalletStatus.CLOSED.name());
+        }
+        return new AuditEntry(AuditAction.PERSONAL_DATA_ERASED, AuditEntityType.USER, event.userId(),
+                Map.of("status", "ACTIVE"), after);
     }
 
     private static void putAmount(Map<String, Object> state, Money amount) {

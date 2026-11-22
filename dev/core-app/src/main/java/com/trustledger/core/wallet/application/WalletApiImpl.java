@@ -107,6 +107,19 @@ class WalletApiImpl implements WalletApi {
     }
 
     @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public WalletView close(UUID walletId) {
+        Objects.requireNonNull(walletId, "walletId");
+        Wallet wallet = wallets.findById(walletId).orElseThrow(WalletApiImpl::notFound);
+        if (!locks.isLockedForUpdate(wallet)) {
+            throw new IllegalStateException(
+                    "Wallet " + walletId + " must be locked with lockForUpdate in this transaction first");
+        }
+        wallet.close(clock.instant());
+        return WalletViews.of(wallet);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public WalletLimits limitsFor(UUID walletId) {
         Wallet wallet = wallets.findById(walletId).orElseThrow(WalletApiImpl::notFound);

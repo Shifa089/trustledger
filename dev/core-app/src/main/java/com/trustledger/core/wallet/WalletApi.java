@@ -51,6 +51,16 @@ public interface WalletApi {
     /** Gives a reservation back. Allowed on a frozen wallet, so a rejected held transfer can be undone. */
     WalletView releaseHold(UUID walletId, Money amount);
 
+    /**
+     * Closes an empty wallet for its owner's erasure (FR-PR-2). Same contract as money movement: needs an active
+     * transaction ({@code MANDATORY}) and the wallet locked with {@link #lockForUpdate} first, so no transfer can put
+     * money on it between the check and the close.
+     *
+     * @throws com.trustledger.core.shared.TrustLedgerException {@code WALLET_NOT_EMPTY} with a balance or hold,
+     *         {@code WALLET_FROZEN} for a frozen wallet, {@code INVALID_STATE_TRANSITION} if already closed
+     */
+    WalletView close(UUID walletId);
+
     /** The limits of the wallet's current tier. */
     WalletLimits limitsFor(UUID walletId);
 

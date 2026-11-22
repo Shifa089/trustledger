@@ -119,6 +119,10 @@ public class SecurityConfig {
                         // Customer-only endpoints (SPEC §5). Checked here as well as by @PreAuthorize so a
                         // wrong role gets 403 before the body is parsed (otherwise a bad body gives 400).
                         .requestMatchers("/api/*/me/consents").hasRole(CUSTOMER)
+                        // Privacy (FR-PR-2, M10): own data export, own erasure and the status of own requests.
+                        .requestMatchers(HttpMethod.POST, "/api/*/me/data-export").hasRole(CUSTOMER)
+                        .requestMatchers(HttpMethod.POST, "/api/*/me/erasure-request").hasRole(CUSTOMER)
+                        .requestMatchers(HttpMethod.GET, "/api/*/me/data-requests").hasRole(CUSTOMER)
                         .requestMatchers("/api/*/kyc/**").hasRole(CUSTOMER)
                         .requestMatchers("/api/*/wallets/**").hasRole(CUSTOMER)
                         .requestMatchers(HttpMethod.POST, "/api/*/transfers", "/api/*/topups").hasRole(CUSTOMER)

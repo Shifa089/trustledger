@@ -140,3 +140,36 @@ quoted inside alert details and notes; the case ID stays whole as the report's o
 - The case list and every endpoint have an explicit security rule; `/aml/alerts` (SPEC §5) is denied until built.
 - A request stuck in the outbox (broker down) shows as `publishedAt: null` in the case detail; alerting on old
   pending rows belongs to M12.
+
+## Amendment (2026-11-22, Day 21 B): case lifecycle events for erasure
+
+FR-PR-2 refuses a customer's erasure while an AML case on their wallet is open. core-app has to know that, and
+there were two ways:
+
+1. **Ask the AML service over REST** with a client-credentials token (a new Keycloak client, a new internal
+   endpoint, a secret, an HTTP client with timeouts). Always current, but erasure would then depend on the AML service
+   being up, and the check would be a remote call made while the wallet lock is held, or else not atomic with the
+   erasure.
+2. **Keep a local copy fed by AML events.** Chosen. It reuses the Kafka pipeline and the outbox pattern above, needs
+   no new credentials, and turns the check into a local query under the wallet lock.
+
+**Producer.** Opening a case (rule engine) and finishing it (close as false positive, escalate) insert a row into
+`aml.case_events` in the same transaction: an outbox shaped like `aml.freeze_requests`. `CaseEventRelay` sends pending
+rows as `AmlCaseStatusChangedV1` (`trustledger.aml.case-status-changed.v1`, wallet ID as key) with the same
+`SKIP LOCKED` claim and the same settings as the freeze relay. Assignment (OPEN → INVESTIGATING) isn't sent, because
+the case stays open either way. Officer notes are never part of the message.
+
+**Consumer.** core-app's `privacy` module upserts `privacy.aml_cases (case_id, wallet_id, open)`. A case only ever
+goes from open to finished, so:
+
+- "opened" inserts the case only if it is unknown;
+- "finished" sets `open = false` whatever was there, inserting the case if needed.
+
+Applying the events twice, or in the wrong order, ends in the same state. No `processed_events` table is needed, and
+retries and the DLT work as for freeze requests. The consumer decides on the contract's `open` flag, not on the status
+name, so a status added later on the AML side needs no change in core-app.
+
+**Accepted trade-off: eventual consistency.** A case opened a moment ago may not have arrived yet. That is
+acceptable because AML cases come from transfers the AML service already processed asynchronously, and because
+erasure never touches the ledger, the transfers or the audit trail an investigation relies on. Cases opened before
+this release need a one-off backfill in a real deployment; local and test data start empty.

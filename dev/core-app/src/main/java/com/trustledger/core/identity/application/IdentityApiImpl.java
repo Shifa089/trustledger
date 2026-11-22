@@ -2,7 +2,9 @@ package com.trustledger.core.identity.application;
 
 import com.trustledger.core.identity.IdentityApi;
 import com.trustledger.core.identity.NotificationContact;
+import com.trustledger.core.identity.PersonalDataExport;
 import com.trustledger.core.identity.UserView;
+import com.trustledger.core.identity.domain.ConsentRepository;
 import com.trustledger.core.identity.domain.User;
 import com.trustledger.core.identity.domain.UserRepository;
 import com.trustledger.core.identity.domain.UserStatus;
@@ -11,21 +13,25 @@ import com.trustledger.core.shared.TrustLedgerException;
 import com.trustledger.core.shared.crypto.BlindIndex;
 import com.trustledger.core.shared.masking.Masking;
 import java.time.Clock;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 class IdentityApiImpl implements IdentityApi {
 
     private final UserRepository users;
+    private final ConsentRepository consents;
     private final BlindIndex blindIndex;
     private final Clock clock;
 
-    IdentityApiImpl(UserRepository users, BlindIndex blindIndex, Clock clock) {
+    IdentityApiImpl(UserRepository users, ConsentRepository consents, BlindIndex blindIndex, Clock clock) {
         this.users = users;
+        this.consents = consents;
         this.blindIndex = blindIndex;
         this.clock = clock;
     }
@@ -70,6 +76,20 @@ class IdentityApiImpl implements IdentityApi {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<PersonalDataExport> exportPersonalData(UUID userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+        return users.findById(userId).map(user -> new PersonalDataExport(user.getId(), user.getEmail(),
+                user.getPhone(), user.getFullName(), UserView.Status.valueOf(user.getStatus().name()),
+                user.getCreatedAt(), consents.findByUserIdOrderBySeqAsc(userId).stream()
+                        .map(c -> new PersonalDataExport.ConsentRecord(c.getPurpose().name(), c.getPolicyVersion(),
+                                c.isGranted(), c.getCapturedAt(), c.getIp()))
+                        .toList()));
+    }
+
+    @Override
     @Transactional
     public void recordVerifiedPhone(UUID userId, String phone) {
         String normalised;
@@ -95,6 +115,22 @@ class IdentityApiImpl implements IdentityApi {
         } catch (DataIntegrityViolationException raceLost) {
             throw phoneTaken();
         }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void erasePersonalData(UUID userId) {
+        Objects.requireNonNull(userId, "userId");
+        User user = users.findById(userId)
+                .orElseThrow(() -> new TrustLedgerException(ErrorCode.NOT_FOUND, "User not found."));
+        if (!user.isActive()) {
+            throw new TrustLedgerException(ErrorCode.INVALID_STATE_TRANSITION,
+                    "This account's personal data has already been erased.");
+        }
+        consents.clearIpAddresses(userId);
+        user.erase(clock.instant());
+        // Flush now: the database check (an ERASED row holds no personal data) runs inside this call.
+        users.saveAndFlush(user);
     }
 
     private static TrustLedgerException phoneTaken() {

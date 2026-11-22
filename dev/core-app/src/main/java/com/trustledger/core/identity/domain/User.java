@@ -111,6 +111,25 @@ public class User {
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 
+    /**
+     * FR-PR-2: ACTIVE -> ERASED. E-mail, phone and name are removed together with their blind indexes (an HMAC of the
+     * phone would still let anyone with the key confirm the number was a customer's). The row itself stays: ledger,
+     * transfers and audit events refer to this ID, and the Keycloak subject is a random identifier, not personal data
+     * about the person. Nulls rather than placeholder text: nothing to decrypt, nothing that looks real.
+     *
+     * @throws IllegalStateException if the user is already erased
+     */
+    public void erase(Instant now) {
+        requireActive();
+        this.email = null;
+        this.emailHash = null;
+        this.phone = null;
+        this.phoneHash = null;
+        this.fullName = null;
+        this.status = UserStatus.ERASED;
+        this.updatedAt = Objects.requireNonNull(now, "now");
+    }
+
     public boolean isActive() {
         return status == UserStatus.ACTIVE;
     }

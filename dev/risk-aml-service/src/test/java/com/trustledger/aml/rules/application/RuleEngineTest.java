@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 import com.trustledger.aml.cases.domain.Alert;
 import com.trustledger.aml.cases.domain.AlertRepository;
 import com.trustledger.aml.cases.domain.AmlCase;
+import com.trustledger.aml.cases.domain.CaseEvent;
+import com.trustledger.aml.cases.domain.CaseEventRepository;
 import com.trustledger.aml.cases.domain.AmlCaseRepository;
 import com.trustledger.aml.cases.domain.FreezeRequest;
 import com.trustledger.aml.cases.domain.FreezeRequestRepository;
@@ -46,6 +48,8 @@ class RuleEngineTest {
     private final AmlCaseRepository cases = mock(AmlCaseRepository.class);
     private final AlertRepository alerts = mock(AlertRepository.class);
     private final FreezeRequestRepository freezeRequests = mock(FreezeRequestRepository.class);
+    private final CaseEventRepository caseEvents = mock(CaseEventRepository.class);
+    private final List<CaseEvent> savedCaseEvents = new ArrayList<>();
     private final List<AmlCase> savedCases = new ArrayList<>();
     private final List<Alert> savedAlerts = new ArrayList<>();
     private final List<FreezeRequest> savedFreezeRequests = new ArrayList<>();
@@ -72,6 +76,11 @@ class RuleEngineTest {
             ReflectionTestUtils.setField(request, "id", UUID.randomUUID());
             savedFreezeRequests.add(request);
             return request;
+        });
+        when(caseEvents.save(any())).thenAnswer(call -> {
+            CaseEvent event = call.getArgument(0);
+            savedCaseEvents.add(event);
+            return event;
         });
     }
 
@@ -142,6 +151,12 @@ class RuleEngineTest {
             assertThat(alert.getDetails()).isEqualTo("R2 hit");
             assertThat(alert.getCreatedAt()).isEqualTo(NOW);
         });
+        assertThat(savedCaseEvents).as("the outbox learns the case opened").singleElement().satisfies(event -> {
+            assertThat(event.getCaseId()).isEqualTo(savedCases.getFirst().getId());
+            assertThat(event.getWalletId()).isEqualTo(LOW_WALLET);
+            assertThat(event.getStatus()).isEqualTo("OPEN");
+            assertThat(event.getOccurredAt()).isEqualTo(NOW);
+        });
     }
 
     @Test
@@ -154,6 +169,7 @@ class RuleEngineTest {
         List<RaisedAlert> raised = engine.evaluate(List.of(outgoing(LOW_WALLET)));
 
         assertThat(savedCases).containsExactly(open);
+        assertThat(savedCaseEvents).as("joining an open case sends no event").isEmpty();
         assertThat(raised).singleElement().satisfies(alert -> assertThat(alert.caseId()).isEqualTo(open.getId()));
         assertThat(open.getUpdatedAt()).isEqualTo(NOW);
     }
@@ -222,7 +238,7 @@ class RuleEngineTest {
     }
 
     private RuleEngine engine(AmlRule... rules) {
-        return new RuleEngine(List.of(rules), lock, cases, alerts, freezeRequests,
+        return new RuleEngine(List.of(rules), lock, cases, alerts, freezeRequests, caseEvents,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 

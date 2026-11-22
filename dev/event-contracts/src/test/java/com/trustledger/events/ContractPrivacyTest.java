@@ -19,10 +19,10 @@ import org.junit.jupiter.params.provider.FieldSource;
 class ContractPrivacyTest {
 
     static final List<Class<? extends Record>> CONTRACTS = List.of(TransferCompletedV1.class, TopupCapturedV1.class,
-            WalletFrozenV1.class, AccountFreezeRequestedV1.class);
+            WalletFrozenV1.class, AccountFreezeRequestedV1.class, AmlCaseStatusChangedV1.class);
 
     private static final Set<String> ALLOWED = Set.of("eventId", "occurredAt", "walletId", "counterpartyWalletId",
-            "transferId", "topupId", "caseId", "amountMinor", "currency", "source", "ruleCode");
+            "transferId", "topupId", "caseId", "amountMinor", "currency", "source", "ruleCode", "status", "open");
 
     private static final Pattern PERSONAL = Pattern.compile(
             "(?i).*(user|name|email|mail|phone|mobile|pan|dob|birth|address|note|reason|detail|ip).*");
