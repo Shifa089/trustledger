@@ -5,7 +5,8 @@
  *   <li><b>Domain facts</b> (Day 19): the public domain events of the other modules
  *       ({@link com.trustledger.core.kyc.KycLevelUpgraded}, {@link com.trustledger.core.wallet.WalletCreated},
  *       {@link com.trustledger.core.wallet.WalletFrozen}, {@link com.trustledger.core.wallet.WalletUnfrozen},
- *       {@link com.trustledger.core.payments.TopupCaptured}, {@link com.trustledger.core.payments.TransferCompleted})
+ *       {@link com.trustledger.core.payments.TopupCaptured}, {@link com.trustledger.core.payments.TransferCompleted},
+ *       {@link com.trustledger.core.privacy.PersonalDataErased})
  *       are written <b>before the publishing transaction commits, in that transaction</b>.</li>
  *   <li><b>Officer and admin requests</b> (Day 20): endpoints marked
  *       {@link com.trustledger.core.shared.audit.Audited} are written by an aspect after the call, with the outcome

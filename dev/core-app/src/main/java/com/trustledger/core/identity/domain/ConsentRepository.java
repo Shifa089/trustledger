@@ -13,4 +13,12 @@ public interface ConsentRepository {
 
     /** Full history, oldest first. */
     List<Consent> findByUserIdOrderBySeqAsc(UUID userId);
+
+    /**
+     * FR-PR-2 erasure: blanks the IP address of every consent row of the user; the only change the database's
+     * append-only trigger allows (V23). Joins the caller's transaction.
+     *
+     * @return how many rows had an IP address
+     */
+    int clearIpAddresses(UUID userId);
 }

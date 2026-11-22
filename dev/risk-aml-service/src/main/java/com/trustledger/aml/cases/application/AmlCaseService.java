@@ -8,6 +8,8 @@ import com.trustledger.aml.cases.domain.Alert;
 import com.trustledger.aml.cases.domain.AlertRepository;
 import com.trustledger.aml.cases.domain.AmlCase;
 import com.trustledger.aml.cases.domain.AmlCaseRepository;
+import com.trustledger.aml.cases.domain.CaseEvent;
+import com.trustledger.aml.cases.domain.CaseEventRepository;
 import com.trustledger.aml.cases.domain.CaseStatus;
 import com.trustledger.aml.cases.domain.FreezeRequestRepository;
 import com.trustledger.aml.facts.domain.TransactionFact;
@@ -23,6 +25,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -46,15 +49,18 @@ public class AmlCaseService {
     private final AmlCaseRepository cases;
     private final AlertRepository alerts;
     private final FreezeRequestRepository freezeRequests;
+    private final CaseEventRepository caseEvents;
     private final TransactionFactRepository facts;
     private final CaseProperties properties;
     private final Clock clock;
 
     public AmlCaseService(AmlCaseRepository cases, AlertRepository alerts, FreezeRequestRepository freezeRequests,
-            TransactionFactRepository facts, CaseProperties properties, Clock clock) {
+            CaseEventRepository caseEvents, TransactionFactRepository facts, CaseProperties properties,
+            Clock clock) {
         this.cases = cases;
         this.alerts = alerts;
         this.freezeRequests = freezeRequests;
+        this.caseEvents = caseEvents;
         this.facts = facts;
         this.properties = properties;
         this.clock = clock;
@@ -106,7 +112,9 @@ public class AmlCaseService {
     @Transactional
     public CaseDetail closeAsFalsePositive(UUID caseId, UUID caller, String notes) {
         AmlCase amlCase = find(caseId);
-        amlCase.closeAsFalsePositive(caller, notes, clock.instant());
+        Instant now = clock.instant();
+        amlCase.closeAsFalsePositive(caller, notes, now);
+        recordFinished(amlCase, now);
         log.info("AML case closed as false positive case={} by={}", caseId, caller);
         return detail(amlCase);
     }
@@ -114,7 +122,9 @@ public class AmlCaseService {
     @Transactional
     public CaseDetail escalate(UUID caseId, UUID caller, String notes) {
         AmlCase amlCase = find(caseId);
-        amlCase.escalate(caller, notes, clock.instant());
+        Instant now = clock.instant();
+        amlCase.escalate(caller, notes, now);
+        recordFinished(amlCase, now);
         log.info("AML case escalated case={} by={}", caseId, caller);
         return detail(amlCase);
     }
@@ -131,6 +141,14 @@ public class AmlCaseService {
         String csv = StrReportCsv.render(amlCase, caseAlerts, factsAround(amlCase, caseAlerts));
         log.info("STR report exported case={}", caseId);
         return new StrReport("str-" + caseId + ".csv", csv);
+    }
+
+    /**
+     * The "finished" event goes into the outbox in this transaction, so core-app learns the case is no longer open
+     * (it then allows erasure again, FR-PR-2). The notes are not part of it.
+     */
+    private void recordFinished(AmlCase amlCase, Instant now) {
+        caseEvents.save(CaseEvent.of(amlCase, MDC.get("correlationId"), now));
     }
 
     private CaseDetail detail(AmlCase amlCase) {

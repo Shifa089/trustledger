@@ -109,6 +109,14 @@ class SecurityMatrixIT {
             "GET, /api/v1/me/data-requests,               ADMIN,              403",
             "GET, /api/v1/me/data-requests,               AUDITOR,            403",
             "POST, /api/v1/me/data-requests,              CUSTOMER,           403",
+            "POST, /api/v1/me/erasure-request,            NONE,               401",
+            "POST, /api/v1/me/erasure-request,            NO_ROLES,           403",
+            // Allowed: the matrix's caller is never provisioned (no JIT filter here), so the service answers 404.
+            "POST, /api/v1/me/erasure-request,            CUSTOMER,           404",
+            "POST, /api/v1/me/erasure-request,            COMPLIANCE_OFFICER, 403",
+            "POST, /api/v1/me/erasure-request,            ADMIN,              403",
+            "POST, /api/v1/me/erasure-request,            AUDITOR,            403",
+            "GET, /api/v1/me/erasure-request,             CUSTOMER,           403",
             // An endpoint with no role rule fails closed (Day 14 B, L3): refused for every role, even with a token.
             "GET, /api/v1/customer/probe,                 NONE,               401",
             "GET, /api/v1/customer/probe,                 NO_ROLES,           403",

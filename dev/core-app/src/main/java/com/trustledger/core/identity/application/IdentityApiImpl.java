@@ -13,10 +13,12 @@ import com.trustledger.core.shared.TrustLedgerException;
 import com.trustledger.core.shared.crypto.BlindIndex;
 import com.trustledger.core.shared.masking.Masking;
 import java.time.Clock;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -113,6 +115,22 @@ class IdentityApiImpl implements IdentityApi {
         } catch (DataIntegrityViolationException raceLost) {
             throw phoneTaken();
         }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void erasePersonalData(UUID userId) {
+        Objects.requireNonNull(userId, "userId");
+        User user = users.findById(userId)
+                .orElseThrow(() -> new TrustLedgerException(ErrorCode.NOT_FOUND, "User not found."));
+        if (!user.isActive()) {
+            throw new TrustLedgerException(ErrorCode.INVALID_STATE_TRANSITION,
+                    "This account's personal data has already been erased.");
+        }
+        consents.clearIpAddresses(userId);
+        user.erase(clock.instant());
+        // Flush now: the database check (an ERASED row holds no personal data) runs inside this call.
+        users.saveAndFlush(user);
     }
 
     private static TrustLedgerException phoneTaken() {

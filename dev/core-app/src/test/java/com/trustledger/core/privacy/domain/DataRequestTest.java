@@ -136,4 +136,26 @@ class DataRequestTest {
             throw new AssertionError(e);
         }
     }
+
+    @Test
+    void anErasureIsRecordedCompletedWhenItHasHappened() {
+        DataRequest request = DataRequest.erasure(USER, T0);
+
+        assertThat(request.getType()).isEqualTo(DataRequestType.ERASURE);
+        assertThat(request.getStatus()).isEqualTo(DataRequestStatus.COMPLETED);
+        assertThat(request.getRequestedAt()).isEqualTo(T0);
+        assertThat(request.getCompletedAt()).isEqualTo(T0);
+        assertThat(request.getResultS3Key()).isNull();
+        assertThat(request.hasDownload()).isFalse();
+        assertThat(request.isPending()).isFalse();
+    }
+
+    @Test
+    void aCompletedErasureCantFailOrBecomeAnExport() {
+        DataRequest request = DataRequest.erasure(USER, T0);
+
+        assertThatThrownBy(() -> request.fail("X", T0)).isInstanceOf(TrustLedgerException.class)
+                .extracting(e -> ((TrustLedgerException) e).errorCode()).isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+        assertThatThrownBy(() -> request.completeExport(T0)).isInstanceOf(IllegalStateException.class);
+    }
 }

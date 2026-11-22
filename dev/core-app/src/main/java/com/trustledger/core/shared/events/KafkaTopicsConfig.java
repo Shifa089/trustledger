@@ -1,6 +1,7 @@
 package com.trustledger.core.shared.events;
 
 import com.trustledger.events.AccountFreezeRequestedV1;
+import com.trustledger.events.AmlCaseStatusChangedV1;
 import com.trustledger.events.TopupCapturedV1;
 import com.trustledger.events.TransferCompletedV1;
 import com.trustledger.events.WalletFrozenV1;
@@ -17,9 +18,9 @@ import org.springframework.kafka.core.KafkaAdmin;
  * Creates the contract topics at startup, locally and in tests only ({@code trustledger.events.topics.create}).
  * In AWS the topics belong to the infrastructure, with production partition and replica counts.
  * <p>
- * All four contract topics, including {@link AccountFreezeRequestedV1#TOPIC}: risk-aml-service produces that one
- * (M9), and core-app consumes it, so it must exist locally whichever app starts first. Creating an existing topic
- * is a no-op.
+ * Every contract topic, including the two risk-aml-service produces and core-app consumes
+ * ({@link AccountFreezeRequestedV1#TOPIC}, M9; {@link AmlCaseStatusChangedV1#TOPIC}, M10), so they exist locally
+ * whichever app starts first. Creating an existing topic is a no-op.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnBooleanProperty("trustledger.events.topics.create")
@@ -27,11 +28,12 @@ public class KafkaTopicsConfig {
 
     /** Every contract topic, in one place (also used by tests). */
     public static final List<String> TOPICS = List.of(TransferCompletedV1.TOPIC, TopupCapturedV1.TOPIC,
-            WalletFrozenV1.TOPIC, AccountFreezeRequestedV1.TOPIC);
+            WalletFrozenV1.TOPIC, AccountFreezeRequestedV1.TOPIC, AmlCaseStatusChangedV1.TOPIC);
 
     /** Dead-letter topics of the topics core-app consumes (M9): {@code <topic>.DLT}. */
     public static final List<String> DEAD_LETTER_TOPICS = List.of(
-            AccountFreezeRequestedV1.TOPIC + KafkaConsumerProperties.DLT_SUFFIX);
+            AccountFreezeRequestedV1.TOPIC + KafkaConsumerProperties.DLT_SUFFIX,
+            AmlCaseStatusChangedV1.TOPIC + KafkaConsumerProperties.DLT_SUFFIX);
 
     @Bean
     KafkaAdmin.NewTopics contractTopics(EventsProperties properties) {

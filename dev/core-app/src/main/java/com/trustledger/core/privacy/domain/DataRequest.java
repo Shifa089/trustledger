@@ -22,10 +22,11 @@ import org.hibernate.annotations.UuidGenerator;
  * <pre>
  * PENDING --completeExport(key)--&gt; COMPLETED
  * PENDING --fail(reason)---------&gt; FAILED
+ * erasure(user) ------------------&gt; COMPLETED   (synchronous: written once the erasure has happened)
  * </pre>
  * Any other step throws {@link ErrorCode#INVALID_STATE_TRANSITION}. Invariants, also enforced by database checks
- * ({@code V21}): only a completed export has a result key; a finished request has a completion time; only a failed
- * one has a reason. Holds no personal data.
+ * ({@code V21}, {@code V24}): only a completed export has a result key; a finished request has a completion time;
+ * only a failed one has a reason; a user has at most one completed erasure. Holds no personal data.
  */
 @Entity
 @Table(name = "data_requests", schema = "privacy")
@@ -81,6 +82,24 @@ public class DataRequest {
         request.type = DataRequestType.EXPORT;
         request.status = DataRequestStatus.PENDING;
         request.requestedAt = now;
+        request.createdAt = now;
+        request.updatedAt = now;
+        return request;
+    }
+
+    /**
+     * A completed erasure. Erasure runs synchronously in the request's transaction, so its record is written once it
+     * has happened: COMPLETED, finished at {@code now}. A refused erasure leaves no row (the 409 is the answer).
+     */
+    public static DataRequest erasure(UUID userId, Instant now) {
+        Objects.requireNonNull(userId, "userId");
+        Objects.requireNonNull(now, "now");
+        DataRequest request = new DataRequest();
+        request.userId = userId;
+        request.type = DataRequestType.ERASURE;
+        request.status = DataRequestStatus.COMPLETED;
+        request.requestedAt = now;
+        request.completedAt = now;
         request.createdAt = now;
         request.updatedAt = now;
         return request;

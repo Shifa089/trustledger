@@ -5,16 +5,24 @@ import com.trustledger.core.payments.TopupRecord;
 import com.trustledger.core.payments.TransferRecord;
 import com.trustledger.core.payments.domain.Topup;
 import com.trustledger.core.payments.domain.TopupRepository;
+import com.trustledger.core.payments.domain.TopupStatus;
 import com.trustledger.core.payments.domain.Transfer;
 import com.trustledger.core.payments.domain.TransferRepository;
+import com.trustledger.core.payments.domain.TransferStatus;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 class PaymentsApiImpl implements PaymentsApi {
+
+    /** Transfers that may still move money: not completed, rejected, failed or reversed yet. */
+    private static final Set<TransferStatus> UNFINISHED = EnumSet.of(TransferStatus.INITIATED,
+            TransferStatus.HELD_FOR_REVIEW);
 
     private final TransferRepository transfers;
     private final TopupRepository topups;
@@ -36,6 +44,16 @@ class PaymentsApiImpl implements PaymentsApi {
     public List<TopupRecord> topupsOf(UUID walletId) {
         Objects.requireNonNull(walletId, "walletId");
         return topups.findByWalletIdOrderByCreatedAtAscIdAsc(walletId).stream().map(PaymentsApiImpl::record).toList();
+    }
+
+    /** One user's history, so filtering in memory is cheap; it reuses the export's queries and their indexes. */
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasMoneyInFlight(UUID walletId) {
+        Objects.requireNonNull(walletId, "walletId");
+        return transfers.findInvolving(walletId).stream().anyMatch(t -> UNFINISHED.contains(t.getStatus()))
+                || topups.findByWalletIdOrderByCreatedAtAscIdAsc(walletId).stream()
+                        .anyMatch(t -> TopupStatus.OPEN.contains(t.getStatus()));
     }
 
     static TransferRecord record(Transfer transfer) {

@@ -155,4 +155,31 @@ class ContractRecordsTest {
                     .withMessage("caseId");
         }
     }
+
+    @Nested
+    class AmlCaseStatusChanged {
+
+        @Test
+        void validEventKeepsItsFields() {
+            var opened = new AmlCaseStatusChangedV1(EVENT, AT, WALLET_A, REF, "OPEN", true);
+            var closed = new AmlCaseStatusChangedV1(EVENT, AT, WALLET_A, REF, "ESCALATED", false);
+
+            assertThat(opened.open()).isTrue();
+            assertThat(closed.open()).isFalse();
+            assertThat(closed.status()).isEqualTo("ESCALATED");
+            assertThat(AmlCaseStatusChangedV1.TOPIC).isEqualTo("trustledger.aml.case-status-changed.v1");
+        }
+
+        @Test
+        void rejectsMissingCaseOrBlankStatus() {
+            assertThatNullPointerException()
+                    .isThrownBy(() -> new AmlCaseStatusChangedV1(EVENT, AT, WALLET_A, null, "OPEN", true))
+                    .withMessage("caseId");
+            assertThatNullPointerException()
+                    .isThrownBy(() -> new AmlCaseStatusChangedV1(EVENT, AT, null, REF, "OPEN", true))
+                    .withMessage("walletId");
+            assertThatThrownBy(() -> new AmlCaseStatusChangedV1(EVENT, AT, WALLET_A, REF, " ", true))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
 }

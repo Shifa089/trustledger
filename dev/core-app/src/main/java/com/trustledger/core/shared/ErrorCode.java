@@ -26,6 +26,10 @@ public enum ErrorCode {
     /** Someone else changed the same record first (optimistic lock); reload and retry. */
     CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "Concurrent modification"),
     WALLET_FROZEN(HttpStatus.CONFLICT, "Wallet frozen"),
+    /** Erasure (FR-PR-2) closes the wallet, which needs it empty: no balance, no hold, no money on its way. */
+    WALLET_NOT_EMPTY(HttpStatus.CONFLICT, "Wallet not empty"),
+    /** Erasure (FR-PR-2) is refused while an AML case on the user's wallet is open (OPEN or INVESTIGATING). */
+    AML_CASE_OPEN(HttpStatus.CONFLICT, "AML case open"),
     /** The same business event (or the reversal of an entry) was already posted to the ledger. */
     DUPLICATE_POSTING(HttpStatus.CONFLICT, "Duplicate posting"),
     /** Uploaded file larger than the configured maximum (5 MB for KYC documents). */

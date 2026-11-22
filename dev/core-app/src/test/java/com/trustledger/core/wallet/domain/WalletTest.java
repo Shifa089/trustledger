@@ -446,4 +446,52 @@ class WalletTest {
             assertThatNullPointerException().isThrownBy(() -> wallet().linkLedgerAccount(null, T1));
         }
     }
+
+    @Nested
+    class Close {
+
+        @Test
+        void anEmptyActiveWalletCloses() {
+            Wallet wallet = wallet();
+
+            wallet.close(T1);
+
+            assertThat(wallet.getStatus()).isEqualTo(WalletStatus.CLOSED);
+            assertThat(wallet.getUpdatedAt()).isEqualTo(T1);
+        }
+
+        @Test
+        void aWalletWithMoneyIsRefusedAndStaysActive() {
+            Wallet wallet = walletWith(1);
+
+            assertCode(() -> wallet.close(T1), ErrorCode.WALLET_NOT_EMPTY);
+            assertThat(wallet.getStatus()).isEqualTo(WalletStatus.ACTIVE);
+        }
+
+        @Test
+        void aWalletWithAHoldIsRefused() {
+            Wallet wallet = walletWith(500);
+            wallet.hold(inr(500), T0); // available is 0, but the money is still on the wallet
+
+            assertCode(() -> wallet.close(T1), ErrorCode.WALLET_NOT_EMPTY);
+        }
+
+        @Test
+        void aFrozenWalletStaysUnderItsHold() {
+            Wallet wallet = wallet();
+            wallet.freeze("AML case, rule R2", FreezeSource.AML, null, T0);
+
+            assertCode(() -> wallet.close(T1), ErrorCode.WALLET_FROZEN);
+            assertThat(wallet.getStatus()).isEqualTo(WalletStatus.FROZEN);
+        }
+
+        @Test
+        void aClosedWalletCantBeClosedAgainOrMoveMoney() {
+            Wallet wallet = wallet();
+            wallet.close(T1);
+
+            assertCode(() -> wallet.close(T1), ErrorCode.INVALID_STATE_TRANSITION);
+            assertCode(() -> wallet.credit(inr(100), T1), ErrorCode.INVALID_STATE_TRANSITION);
+        }
+    }
 }

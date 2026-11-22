@@ -5,6 +5,7 @@ import com.trustledger.core.audit.domain.AuditEntry;
 import com.trustledger.core.kyc.KycLevelUpgraded;
 import com.trustledger.core.payments.TopupCaptured;
 import com.trustledger.core.payments.TransferCompleted;
+import com.trustledger.core.privacy.PersonalDataErased;
 import com.trustledger.core.shared.EventMetadata;
 import com.trustledger.core.wallet.WalletCreated;
 import com.trustledger.core.wallet.WalletFrozen;
@@ -74,6 +75,12 @@ class AuditListeners {
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     void on(TransferCompleted event) {
         write(AuditEntries.of(event), event.metadata());
+    }
+
+    @Order(Ordered.LOWEST_PRECEDENCE)
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    void on(PersonalDataErased event) {
+        write(AuditEntries.of(event), null);
     }
 
     /** The event's own correlation ID wins: it was captured when the event was published. */

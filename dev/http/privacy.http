@@ -15,3 +15,13 @@ Authorization: Bearer {{customer1_token}}
 
 ### No token -> 401
 GET {{api}}/api/v1/me/data-requests
+
+### customer1: erase my personal data -> 200 {id, type ERASURE, status COMPLETED, requestedAt, completedAt}
+# Synchronous and irreversible: e-mail, phone and name (and their blind indexes) are removed, consent IPs blanked,
+# the wallet closed. Ledger, transfers, top-ups, audit events and KYC records stay (ADR 0009). Refusals, nothing changed:
+#   409 AML_CASE_OPEN            an AML case on the wallet is open (OPEN or INVESTIGATING)
+#   409 WALLET_NOT_EMPTY         money on the wallet, or a transfer/top-up still in progress
+#   409 WALLET_FROZEN            the wallet is frozen
+#   409 INVALID_STATE_TRANSITION already erased
+POST {{api}}/api/v1/me/erasure-request
+Authorization: Bearer {{customer1_token}}

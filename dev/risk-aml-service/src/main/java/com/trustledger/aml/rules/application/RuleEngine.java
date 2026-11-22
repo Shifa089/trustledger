@@ -4,6 +4,8 @@ import com.trustledger.aml.cases.domain.Alert;
 import com.trustledger.aml.cases.domain.AlertRepository;
 import com.trustledger.aml.cases.domain.AmlCase;
 import com.trustledger.aml.cases.domain.AmlCaseRepository;
+import com.trustledger.aml.cases.domain.CaseEvent;
+import com.trustledger.aml.cases.domain.CaseEventRepository;
 import com.trustledger.aml.cases.domain.FreezeRequest;
 import com.trustledger.aml.cases.domain.FreezeRequestRepository;
 import com.trustledger.aml.facts.domain.TransactionFact;
@@ -54,15 +56,18 @@ public class RuleEngine {
     private final AmlCaseRepository cases;
     private final AlertRepository alerts;
     private final FreezeRequestRepository freezeRequests;
+    private final CaseEventRepository caseEvents;
     private final Clock clock;
 
     public RuleEngine(List<AmlRule> rules, WalletEvaluationLock lock, AmlCaseRepository cases,
-            AlertRepository alerts, FreezeRequestRepository freezeRequests, Clock clock) {
+            AlertRepository alerts, FreezeRequestRepository freezeRequests, CaseEventRepository caseEvents,
+            Clock clock) {
         this.rules = List.copyOf(rules);
         this.lock = lock;
         this.cases = cases;
         this.alerts = alerts;
         this.freezeRequests = freezeRequests;
+        this.caseEvents = caseEvents;
         this.clock = clock;
     }
 
@@ -95,7 +100,7 @@ public class RuleEngine {
             return Optional.empty();
         }
         AmlCase amlCase = cases.findActiveByWalletId(walletId)
-                .orElseGet(() -> cases.save(AmlCase.open(walletId, now)));
+                .orElseGet(() -> openCase(walletId, now));
         Alert alert = alerts.save(Alert.raise(amlCase, rule.code(), rule.severity(), details.description(), now));
         amlCase.alertRaised(now);
         log.info("AML alert raised rule={} severity={} wallet={} case={}", rule.code(), rule.severity(), walletId,
@@ -105,6 +110,13 @@ public class RuleEngine {
             log.info("Freeze requested wallet={} case={} request={}", walletId, amlCase.getId(), request.getId());
         }
         return Optional.of(RaisedAlert.of(alert));
+    }
+
+    /** A new case, and its "opened" event in the outbox (core-app blocks erasure while it is open, FR-PR-2). */
+    private AmlCase openCase(UUID walletId, Instant now) {
+        AmlCase opened = cases.save(AmlCase.open(walletId, now));
+        caseEvents.save(CaseEvent.of(opened, MDC.get(CORRELATION_ID), now));
+        return opened;
     }
 
     private boolean alreadyAlerted(AmlRule rule, UUID walletId, Instant now) {
