@@ -33,7 +33,22 @@ spring:
   # base64 string). String keys (the wallet ID). acks=all plus idempotence:
   # no duplicates from producer retries. A send that can't reach Kafka fails within delivery.timeout.ms instead of
   # hanging; the publication then stays incomplete and is sent again on the next restart. Brokers: per environment.
+  #
+  # Consumer (M9, FR-AML-3): AccountFreezeRequestedV1 from risk-aml-service, read like risk-aml-service reads ours.
+  # ErrorHandlingDeserializer wraps the JSON one, so an unreadable record becomes a DeserializationException for the
+  # error handler (straight to <topic>.DLT) instead of failing the poll loop forever. Only event-contracts classes
+  # may be built from a message (__TypeId__ header). Offsets are committed after the listener returns, i.e. after
+  # the freeze transaction: a crash in between redelivers, and wallet.processed_events skips the repeat.
   kafka:
+    consumer:
+      group-id: core-app
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.trusted.packages: com.trustledger.events
+        spring.json.use.type.headers: true
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
@@ -207,6 +222,13 @@ trustledger:
       create: false
       partitions: 3
       replicas: 1
+    # Consumers (M9): 3 attempts in total (1 s, then 2 s between them), then <topic>.DLT (SPEC §6 "Kafka").
+    consumer:
+      retry:
+        max-attempts: 3
+        initial-interval: 1s
+        multiplier: 2.0
+        max-interval: 10s
   # FR-N-1 notification e-mails (M8). The SMTP server is spring.mail.* below. zone: times shown in e-mails.
   notification:
     from: ${TRUSTLEDGER_MAIL_FROM:no-reply@trustledger.local}

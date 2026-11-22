@@ -14,6 +14,8 @@ import com.trustledger.aml.cases.domain.Alert;
 import com.trustledger.aml.cases.domain.AlertRepository;
 import com.trustledger.aml.cases.domain.AmlCase;
 import com.trustledger.aml.cases.domain.AmlCaseRepository;
+import com.trustledger.aml.cases.domain.FreezeRequest;
+import com.trustledger.aml.cases.domain.FreezeRequestRepository;
 import com.trustledger.aml.facts.domain.TransactionFact;
 import com.trustledger.aml.rules.domain.AlertDetails;
 import com.trustledger.aml.rules.domain.AmlRule;
@@ -31,6 +33,7 @@ import java.util.function.Predicate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.slf4j.MDC;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class RuleEngineTest {
@@ -42,8 +45,10 @@ class RuleEngineTest {
     private final WalletEvaluationLock lock = mock(WalletEvaluationLock.class);
     private final AmlCaseRepository cases = mock(AmlCaseRepository.class);
     private final AlertRepository alerts = mock(AlertRepository.class);
+    private final FreezeRequestRepository freezeRequests = mock(FreezeRequestRepository.class);
     private final List<AmlCase> savedCases = new ArrayList<>();
     private final List<Alert> savedAlerts = new ArrayList<>();
+    private final List<FreezeRequest> savedFreezeRequests = new ArrayList<>();
 
     @BeforeEach
     void persistLikeJpa() {
@@ -62,6 +67,52 @@ class RuleEngineTest {
             savedAlerts.add(alert);
             return alert;
         });
+        when(freezeRequests.save(any())).thenAnswer(call -> {
+            FreezeRequest request = call.getArgument(0);
+            ReflectionTestUtils.setField(request, "id", UUID.randomUUID());
+            savedFreezeRequests.add(request);
+            return request;
+        });
+    }
+
+    // --- FR-AML-3: a HIGH alert writes a freeze request (the outbox), a MEDIUM one doesn't ---------------------
+
+    @Test
+    void aHighAlertWritesAFreezeRequestForItsWalletAndCase() {
+        RuleEngine engine = engine(rule("R2", Severity.HIGH, fact -> true));
+
+        try (MDC.MDCCloseable ignored = MDC.putCloseable("correlationId", "corr-123")) {
+            engine.evaluate(List.of(outgoing(LOW_WALLET)));
+        }
+
+        Alert alert = savedAlerts.getFirst();
+        assertThat(savedFreezeRequests).singleElement().satisfies(request -> {
+            assertThat(request.getAlertId()).isEqualTo(alert.getId());
+            assertThat(request.getCaseId()).isEqualTo(alert.getCaseId());
+            assertThat(request.getWalletId()).isEqualTo(LOW_WALLET);
+            assertThat(request.getRuleCode()).isEqualTo("R2");
+            assertThat(request.getCorrelationId()).isEqualTo("corr-123");
+            assertThat(request.getRequestedAt()).isEqualTo(NOW);
+            assertThat(request.getPublishedAt()).isNull();
+        });
+    }
+
+    @Test
+    void aMediumAlertRequestsNoFreeze() {
+        engine(rule("R3", Severity.MEDIUM, fact -> true)).evaluate(List.of(outgoing(LOW_WALLET)));
+
+        assertThat(savedAlerts).hasSize(1);
+        verify(freezeRequests, never()).save(any());
+    }
+
+    @Test
+    void aSuppressedHighHitRequestsNoSecondFreeze() {
+        when(alerts.existsByWalletIdAndRuleCodeAndCreatedAtGreaterThanEqual(eq(LOW_WALLET), eq("R4"), any()))
+                .thenReturn(true);
+
+        engine(rule("R4", Severity.HIGH, fact -> true, Duration.ofHours(24))).evaluate(List.of(outgoing(LOW_WALLET)));
+
+        verify(freezeRequests, never()).save(any());
     }
 
     @Test
@@ -171,7 +222,8 @@ class RuleEngineTest {
     }
 
     private RuleEngine engine(AmlRule... rules) {
-        return new RuleEngine(List.of(rules), lock, cases, alerts, Clock.fixed(NOW, ZoneOffset.UTC));
+        return new RuleEngine(List.of(rules), lock, cases, alerts, freezeRequests,
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static AmlRule rule(String code, Severity severity, Predicate<TransactionFact> fires) {

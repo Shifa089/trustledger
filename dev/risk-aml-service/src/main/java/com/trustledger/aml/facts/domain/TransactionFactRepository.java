@@ -1,7 +1,9 @@
 package com.trustledger.aml.facts.domain;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Limit;
 
 /** Port for {@code aml.transaction_facts}. Append-only: there is no update and no delete. */
 public interface TransactionFactRepository {
@@ -17,4 +19,8 @@ public interface TransactionFactRepository {
     List<TransactionFact> findByEventId(UUID eventId);
 
     List<TransactionFact> findByWalletIdOrderByOccurredAtAsc(UUID walletId);
+
+    /** The wallet's facts in {@code [from, to]}, oldest first, at most {@code limit} (case detail, STR report). */
+    List<TransactionFact> findByWalletIdAndOccurredAtBetweenOrderByOccurredAtAscIdAsc(UUID walletId, Instant from,
+            Instant to, Limit limit);
 }

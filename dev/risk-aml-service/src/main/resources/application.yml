@@ -68,6 +68,17 @@ trustledger:
         create: false
         partitions: 3
         replicas: 1
+    # FR-AML-3 outbox relay (ADR 0007): sends pending AccountFreezeRequestedV1 rows; at least once, same eventId.
+    freeze-relay:
+      interval: 1s
+      batch-size: 50
+      send-timeout: 10s
+    # Case detail (FR-AML-4): the wallet's facts from the first alert minus this lookback (the longest rule window)
+    # up to the last alert, at most max-facts rows. The case list pages at most max-page-size cases.
+    cases:
+      fact-lookback: 24h
+      max-facts: 500
+      max-page-size: 100
     # AML rules R1-R4 (SPEC §2 "AML rules (configurable)", AmlProperties). Amounts in paise. Windows end at the
     # injected Clock's "now". A rule that alerted for a wallet within its window doesn't alert again (R3 always does).
     rules:

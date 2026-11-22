@@ -53,4 +53,15 @@ public interface WalletApi {
 
     /** The limits of the wallet's current tier. */
     WalletLimits limitsFor(UUID walletId);
+
+    /**
+     * FR-AML-3: the AML service asks to freeze a wallet. Runs in its own transaction and is idempotent by
+     * {@code eventId} ({@code wallet.processed_events}): a redelivered request returns {@link AmlFreezeOutcome#DUPLICATE}
+     * and changes nothing. An ACTIVE wallet is frozen with source AML and the reason
+     * {@code "AML case <caseId>, rule <ruleCode>"}; {@code WalletFrozen} is published as for an officer's freeze.
+     *
+     * @throws com.trustledger.core.shared.TrustLedgerException {@code NOT_FOUND} for an unknown wallet (the event is
+     *                                                          then not marked processed)
+     */
+    AmlFreezeOutcome freezeForAml(UUID eventId, UUID walletId, UUID caseId, String ruleCode);
 }

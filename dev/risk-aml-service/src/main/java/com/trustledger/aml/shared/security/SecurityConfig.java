@@ -4,6 +4,7 @@ import jakarta.servlet.DispatcherType;
 import java.time.Duration;
 import java.util.List;
 import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OAuth2ResourceServerProperties;
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -29,8 +30,8 @@ import tools.jackson.databind.json.JsonMapper;
  * Stateless OAuth2 resource server, the same as core-app's (SPEC §6 "Security", M9 "same Keycloak resource-server
  * security"): same realm, same issuer and audience checks, same role mapping ({@link JwtRoleConverter}, a copy).
  * <p>
- * The AML API (SPEC §5) is for compliance officers only. Health is public for probes; the rest of actuator needs
- * ADMIN; anything not listed is denied, so a new endpoint needs its own rule here.
+ * The AML API (SPEC §5) is for compliance officers only, with one explicit rule per endpoint. Health is public for
+ * probes; the rest of actuator needs ADMIN; anything not listed is denied, so a new endpoint needs its own rule here.
  * <p>
  * No CORS: this service has no browser client.
  */
@@ -93,7 +94,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        .requestMatchers("/api/*/aml/**").hasRole(Role.COMPLIANCE_OFFICER.name())
+                        // FR-AML-4 case workflow: one rule per endpoint, so a new endpoint is refused until it
+                        // gets its own (and a row in AmlSecurityIT).
+                        .requestMatchers(HttpMethod.GET, "/api/*/aml/cases", "/api/*/aml/cases/*",
+                                "/api/*/aml/cases/*/str-report").hasRole(Role.COMPLIANCE_OFFICER.name())
+                        .requestMatchers(HttpMethod.POST, "/api/*/aml/cases/*/assign", "/api/*/aml/cases/*/close",
+                                "/api/*/aml/cases/*/escalate").hasRole(Role.COMPLIANCE_OFFICER.name())
                         .requestMatchers("/actuator/**").hasRole(Role.ADMIN.name())
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(rs -> rs

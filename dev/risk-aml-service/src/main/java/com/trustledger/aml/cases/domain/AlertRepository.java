@@ -1,6 +1,7 @@
 package com.trustledger.aml.cases.domain;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,4 +14,7 @@ public interface AlertRepository {
     boolean existsByWalletIdAndRuleCodeAndCreatedAtGreaterThanEqual(UUID walletId, String ruleCode, Instant since);
 
     List<Alert> findByCaseIdOrderByCreatedAtAsc(UUID caseId);
+
+    /** The alerts of one page of cases, for the counts in the case list. */
+    List<Alert> findByCaseIdIn(Collection<UUID> caseIds);
 }
