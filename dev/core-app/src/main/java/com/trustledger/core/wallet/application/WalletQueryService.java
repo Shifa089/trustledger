@@ -13,14 +13,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class WalletQueryService {
 
     private final WalletRepository wallets;
-    private final LimitsProperties limits;
+    private final TierLimitsCatalog limits;
 
-    public WalletQueryService(WalletRepository wallets, LimitsProperties limits) {
+    public WalletQueryService(WalletRepository wallets, TierLimitsCatalog limits) {
         this.wallets = wallets;
         this.limits = limits;
     }
 
-    /** 403 {@code KYC_REQUIRED} until minimum KYC has created the wallet. */
+    /**
+     * 403 {@code KYC_REQUIRED} until minimum KYC has created the wallet.
+     * <p>
+     * <b>The balance is never cached</b> (ADR 0019): the wallet row is read from PostgreSQL on every call. Only the
+     * tier's limits come from the Redis cache ({@link TierLimitsCatalog}).
+     */
     @Transactional(readOnly = true)
     public MyWalletView mine(UUID userId) {
         Wallet wallet = wallets.findByUserId(userId).orElseThrow(() -> new TrustLedgerException(

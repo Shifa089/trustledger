@@ -58,6 +58,11 @@ spring:
         max.block.ms: 10000
         request.timeout.ms: 10000
         delivery.timeout.ms: 30000
+  # Redis cache (M11, ADR 0019) for reference data only: tier limits and ledger account lookups. Balances are
+  # NEVER cached. Only the caches in CacheNames exist (TTLs: trustledger.cache.ttl); a Redis error falls back to
+  # PostgreSQL (fail open).
+  cache:
+    type: redis
   jpa:
     open-in-view: false
     hibernate:
@@ -214,6 +219,12 @@ trustledger:
       - POST /api/*/transfers
       - POST /api/*/topups
     redis-timeout: 500ms
+  # Time to live of each Redis cache (ADR 0019); every cache needs a positive TTL (startup fails otherwise).
+  # Limits change only with a redeploy and the key carries a config fingerprint; ledger account rows never change.
+  cache:
+    ttl:
+      wallet-limits: 1h
+      ledger-accounts: 24h
   # Cron triggers for scheduled jobs (ADR 0013). false switches them off (tests); manual runs still work.
   scheduling:
     enabled: true

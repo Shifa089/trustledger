@@ -119,6 +119,10 @@ class WalletApiImpl implements WalletApi {
         return WalletViews.of(wallet);
     }
 
+    /**
+     * Straight from {@link LimitsProperties}, not from the Redis cache ({@link TierLimitsCatalog}): payments calls this
+     * under the wallet locks, and no remote call may happen while they are held (CLAUDE.md, ADR 0019).
+     */
     @Override
     @Transactional(readOnly = true)
     public WalletLimits limitsFor(UUID walletId) {

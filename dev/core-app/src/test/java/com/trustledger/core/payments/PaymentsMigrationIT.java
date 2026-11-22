@@ -139,7 +139,7 @@ class PaymentsMigrationIT {
     void indexesForLimitsAndCleanupExist() {
         assertThat(jdbc.queryForObject(
                 "select indexdef from pg_indexes where schemaname = 'payments' and indexname = ?", String.class,
-                "ix_transfers_sender_created")).contains("(sender_wallet_id, created_at)");
+                "ix_transfers_sender_created_id")).contains("(sender_wallet_id, created_at, id)"); // V26
         assertThat(jdbc.queryForObject(
                 "select indexdef from pg_indexes where schemaname = 'payments' and indexname = ?", String.class,
                 "ix_idempotency_keys_expires_at")).contains("(expires_at)");

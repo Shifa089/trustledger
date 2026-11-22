@@ -25,8 +25,8 @@ public interface JpaTransferRepository extends JpaRepository<Transfer, UUID>, Tr
             @Param("statuses") Collection<TransferStatus> statuses);
 
     /**
-     * The sender side uses {@code ix_transfers_sender_created} (V11), the receiver side
-     * {@code ix_transfers_receiver_created} (V22).
+     * The sender side uses {@code ix_transfers_sender_created_id} (V26), the receiver side
+     * {@code ix_transfers_receiver_created_id} (V26).
      */
     @Override
     @Query("""
