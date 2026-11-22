@@ -20,10 +20,15 @@ spring:
     bootstrap-servers: localhost:9092
 logging:
   pattern:
-    correlation: "[%X{correlationId:-}] "
+    correlation: "[%X{correlationId:-}] [%X{traceId:-},%X{spanId:-}] "
 trustledger:
   aml:
     kafka:
       # The compose broker doesn't auto-create topics.
       topics:
         create: true
+# Every request traced locally (M12): sampling 100% (the default is 10%).
+management:
+  tracing:
+    sampling:
+      probability: 1.0

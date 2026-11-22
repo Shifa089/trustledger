@@ -1,0 +1,32 @@
+# "obs" profile (M12, ADR 0020): send traces, metrics and logs over OTLP/HTTP to the grafana/otel-lgtm container
+# (docker compose -f infra/docker-compose.yml --profile obs up -d). Use together with local:
+#   -Dspring-boot.run.profiles=local,obs
+# service.name comes from spring.application.name. Grafana: http://localhost:3000.
+management:
+  opentelemetry:
+    resource-attributes:
+      deployment.environment.name: local
+    tracing:
+      export:
+        otlp:
+          endpoint: ${TRUSTLEDGER_OTLP_BASE_URL:http://localhost:4318}/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: ${TRUSTLEDGER_OTLP_BASE_URL:http://localhost:4318}/v1/logs
+  tracing:
+    sampling:
+      probability: 1.0
+    export:
+      otlp:
+        enabled: true
+  logging:
+    export:
+      otlp:
+        enabled: true
+  otlp:
+    metrics:
+      export:
+        enabled: true
+        url: ${TRUSTLEDGER_OTLP_BASE_URL:http://localhost:4318}/v1/metrics
+        step: 15s

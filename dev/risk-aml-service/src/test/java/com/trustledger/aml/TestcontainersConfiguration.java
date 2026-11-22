@@ -1,5 +1,7 @@
 package com.trustledger.aml;
 
+import io.opentelemetry.sdk.logs.export.LogRecordExporter;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
@@ -25,5 +27,24 @@ public class TestcontainersConfiguration {
     @ServiceConnection
     KafkaContainer kafkaContainer() {
         return new KafkaContainer(DockerImageName.parse("apache/kafka:4.4.0"));
+    }
+
+    /**
+     * Spans and log records in memory (M12, ADR 0020): tests call {@code start()} and assert on what the OTLP
+     * collector would receive. Boot adds both exporters to its OpenTelemetry SDK.
+     */
+    @Bean
+    TestTelemetry testTelemetry() {
+        return new TestTelemetry();
+    }
+
+    @Bean
+    SpanExporter testSpanExporter(TestTelemetry testTelemetry) {
+        return testTelemetry.spanExporter();
+    }
+
+    @Bean
+    LogRecordExporter testLogRecordExporter(TestTelemetry testTelemetry) {
+        return testTelemetry.logRecordExporter();
     }
 }

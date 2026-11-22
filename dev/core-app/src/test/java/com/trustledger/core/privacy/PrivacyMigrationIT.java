@@ -85,7 +85,7 @@ class PrivacyMigrationIT {
     @Test
     void theReceiverIndexForTheExportExists() {
         assertThat(jdbc.queryForObject("select count(*) from pg_indexes where schemaname = 'payments'"
-                + " and indexname = 'ix_transfers_receiver_created'", Long.class)).isEqualTo(1);
+                + " and indexname = 'ix_transfers_receiver_created_id'", Long.class)).isEqualTo(1);
     }
 
     // --- V23 / V24: erasure ---------------------------------------------------------------------------------------

@@ -135,8 +135,8 @@ class TopupsMigrationIT {
     @Test
     void walletAndCreatedAtAreIndexedForTheMonthlySum() {
         String definition = jdbc.queryForObject("""
-                select indexdef from pg_indexes where schemaname = 'payments' and indexname = 'ix_topups_wallet_created'""",
+                select indexdef from pg_indexes where schemaname = 'payments' and indexname = 'ix_topups_wallet_created_id'""",
                 String.class);
-        assertThat(definition).contains("(wallet_id, created_at)");
+        assertThat(definition).contains("(wallet_id, created_at, id)"); // V26 replaced V13's index
     }
 }

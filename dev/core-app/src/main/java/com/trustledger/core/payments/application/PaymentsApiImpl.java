@@ -2,6 +2,11 @@ package com.trustledger.core.payments.application;
 
 import com.trustledger.core.payments.PaymentsApi;
 import com.trustledger.core.payments.TopupRecord;
+import com.trustledger.core.payments.TransactionCursor;
+import com.trustledger.core.payments.TransactionFilter;
+import com.trustledger.core.payments.TransactionPage;
+import com.trustledger.core.payments.TransactionSlice;
+import com.trustledger.core.payments.TransactionSort;
 import com.trustledger.core.payments.TransferRecord;
 import com.trustledger.core.payments.domain.Topup;
 import com.trustledger.core.payments.domain.TopupRepository;
@@ -26,8 +31,10 @@ class PaymentsApiImpl implements PaymentsApi {
 
     private final TransferRepository transfers;
     private final TopupRepository topups;
+    private final WalletTransactionQueryService history;
 
-    PaymentsApiImpl(TransferRepository transfers, TopupRepository topups) {
+    PaymentsApiImpl(TransferRepository transfers, TopupRepository topups, WalletTransactionQueryService history) {
+        this.history = history;
         this.transfers = transfers;
         this.topups = topups;
     }
@@ -54,6 +61,16 @@ class PaymentsApiImpl implements PaymentsApi {
         return transfers.findInvolving(walletId).stream().anyMatch(t -> UNFINISHED.contains(t.getStatus()))
                 || topups.findByWalletIdOrderByCreatedAtAscIdAsc(walletId).stream()
                         .anyMatch(t -> TopupStatus.OPEN.contains(t.getStatus()));
+    }
+
+    @Override
+    public TransactionPage transactions(TransactionFilter filter, TransactionSort sort, int page, int size) {
+        return history.page(filter, sort, page, size);
+    }
+
+    @Override
+    public TransactionSlice transactionsAfter(TransactionFilter filter, TransactionCursor after, int size) {
+        return history.after(filter, after, size);
     }
 
     static TransferRecord record(Transfer transfer) {

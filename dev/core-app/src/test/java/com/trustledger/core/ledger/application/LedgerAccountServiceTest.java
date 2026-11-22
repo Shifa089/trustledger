@@ -51,7 +51,8 @@ class LedgerAccountServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new LedgerAccountService(accounts, lines, Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new LedgerAccountService(accounts, new LedgerAccountDirectory(accounts), lines,
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static LedgerAccount saved(LedgerAccount account) {

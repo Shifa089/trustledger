@@ -24,4 +24,20 @@ public interface PaymentsApi {
      * for these, so it never closes a wallet that money is about to reach.
      */
     boolean hasMoneyInFlight(UUID walletId);
+
+    /**
+     * FR-S-1: one page of the wallet's transaction history (transfers in and out, top-ups), read by offset. Ties in
+     * the requested order are broken newest first, then by ID, so pages never overlap.
+     *
+     * @param page zero-based; a page past the end is empty
+     * @param size 1 or more (the caller enforces the upper bound)
+     */
+    TransactionPage transactions(TransactionFilter filter, TransactionSort sort, int page, int size);
+
+    /**
+     * FR-S-1, keyset variant for long histories: up to {@code size} rows newest first, strictly older than
+     * {@code after} ({@code null} for the newest rows). Cost does not grow with the position in the history, and
+     * rows inserted meanwhile never shift the slices.
+     */
+    TransactionSlice transactionsAfter(TransactionFilter filter, TransactionCursor after, int size);
 }

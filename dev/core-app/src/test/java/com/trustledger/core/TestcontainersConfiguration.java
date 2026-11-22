@@ -1,5 +1,7 @@
 package com.trustledger.core;
 
+import io.opentelemetry.sdk.logs.export.LogRecordExporter;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 
@@ -119,5 +121,24 @@ public class TestcontainersConfiguration {
             registry.add("trustledger.privacy.storage.access-key", localStack::getAccessKey);
             registry.add("trustledger.privacy.storage.secret-key", localStack::getSecretKey);
         };
+    }
+
+    /**
+     * Spans and log records in memory (M12, ADR 0020): tests call {@code start()} and assert on what the OTLP
+     * collector would receive. Boot adds both exporters to its OpenTelemetry SDK.
+     */
+    @Bean
+    TestTelemetry testTelemetry() {
+        return new TestTelemetry();
+    }
+
+    @Bean
+    SpanExporter testSpanExporter(TestTelemetry testTelemetry) {
+        return testTelemetry.spanExporter();
+    }
+
+    @Bean
+    LogRecordExporter testLogRecordExporter(TestTelemetry testTelemetry) {
+        return testTelemetry.logRecordExporter();
     }
 }

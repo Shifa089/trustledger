@@ -1,5 +1,6 @@
 package com.trustledger.core.shared.events;
 
+import io.micrometer.observation.ObservationRegistry;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.kafka.common.TopicPartition;
@@ -53,8 +54,9 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
-    DeadLetterPublishingRecoverer deadLetterRecoverer(ProducerFactory<?, ?> bootProducerFactory) {
-        return new DeadLetterPublishingRecoverer(deadLetterTemplate(bootProducerFactory),
+    DeadLetterPublishingRecoverer deadLetterRecoverer(ProducerFactory<?, ?> bootProducerFactory,
+            ObservationRegistry observationRegistry) {
+        return new DeadLetterPublishingRecoverer(deadLetterTemplate(bootProducerFactory, observationRegistry),
                 (record, exception) -> new TopicPartition(record.topic() + KafkaConsumerProperties.DLT_SUFFIX, -1));
     }
 
@@ -66,14 +68,23 @@ public class KafkaConsumerConfig {
      * <p>
      * <b>Deliberately not a bean:</b> a {@code KafkaTemplate} bean would switch off Boot's auto-configured template,
      * and the outbox's Kafka externalization would then send through this JSON one (base64-encoding its bytes).
+     * <p>
+     * Observed (M12): {@code spring.kafka.template.observation-enabled} only reaches Boot's own template, and a
+     * template that isn't a bean never looks up the registry itself. The dead letter is sent while the listener's
+     * span is current, so its {@code traceparent} continues the failed record's trace.
      */
-    static KafkaTemplate<String, Object> deadLetterTemplate(ProducerFactory<?, ?> bootProducerFactory) {
+    static KafkaTemplate<String, Object> deadLetterTemplate(ProducerFactory<?, ?> bootProducerFactory,
+            ObservationRegistry observationRegistry) {
         JacksonJsonSerializer<Object> json = new JacksonJsonSerializer<>();
         json.setAddTypeInfo(false);
         Map<Class<?>, Serializer<?>> byType = new LinkedHashMap<>();
         byType.put(byte[].class, new ByteArraySerializer());
         byType.put(Object.class, json);
-        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(bootProducerFactory.getConfigurationProperties(),
-                new StringSerializer(), new DelegatingByTypeSerializer(byType, true)));
+        KafkaTemplate<String, Object> template = new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(
+                bootProducerFactory.getConfigurationProperties(), new StringSerializer(),
+                new DelegatingByTypeSerializer(byType, true)));
+        template.setObservationEnabled(true);
+        template.setObservationRegistry(observationRegistry);
+        return template;
     }
 }

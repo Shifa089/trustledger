@@ -106,6 +106,23 @@ docker compose -f infra/docker-compose.yml up -d
 | Test checkout (local profile) | http://localhost:8080/checkout.html |
 | Keycloak | http://localhost:8180 |
 | Mailpit | http://localhost:8025 |
+| Grafana (compose profile `obs`) | http://localhost:3000 |
+
+### Observability (traces, metrics, logs)
+
+Grafana LGTM (Tempo, Loki, Prometheus-compatible metrics) runs in the compose profile `obs`; the apps export to it over
+OTLP when they also run with the Spring profile `obs` ([ADR 0020](docs/adr/0020-opentelemetry-otlp-observability.md)):
+
+```bash
+docker compose -f infra/docker-compose.yml --profile obs up -d
+./mvnw -pl core-app spring-boot:run -Dspring-boot.run.profiles=local,obs
+./mvnw -pl risk-aml-service spring-boot:run -Dspring-boot.run.profiles=local,obs
+```
+
+Open Grafana at http://localhost:3000 → Explore. **Tempo**: search by service `core-app` and open a transfer trace;
+the Kafka send and risk-aml-service's consumer span are in the same trace. **Loki**: `{service_name="core-app"}`;
+each line carries `trace_id`/`span_id` and links to its trace. Without `obs`, tracing still runs (trace and span IDs
+on every console line) but nothing is exported.
 
 ### Try the money path
 
@@ -137,7 +154,7 @@ Money paths are tested for the happy path, each rejection rule, idempotent retry
 
 Java 25 · Spring Boot 4 · Spring Security 7 (OAuth2 resource server, Keycloak) · Spring Data JPA · PostgreSQL ·
 Flyway · Spring Modulith · Redis + Bucket4j · Resilience4j · ShedLock · springdoc-openapi · AWS SDK v2 (S3) ·
-Kafka (M8) · Testcontainers · WireMock · ArchUnit · JUnit 5 · Mockito · AssertJ.
+Kafka (M8) · OpenTelemetry + Grafana LGTM (M12) · Testcontainers · WireMock · ArchUnit · JUnit 5 · Mockito · AssertJ.
 
 ## Design decisions
 
@@ -155,6 +172,7 @@ Kafka (M8) · Testcontainers · WireMock · ArchUnit · JUnit 5 · Mockito · As
 | [0014](docs/adr/0014-gateway-resilience-and-wiremock.md) | Gateway resilience and WireMock |
 | [0015](docs/adr/0015-archunit-architecture-rules.md) | ArchUnit for the rules inside a module |
 | [0016](docs/adr/0016-mapping-without-mapstruct.md) | Mapping with static factories, not MapStruct |
+| [0020](docs/adr/0020-opentelemetry-otlp-observability.md) | OpenTelemetry over OTLP to Grafana LGTM |
 
 ## Local authentication (Keycloak)
 

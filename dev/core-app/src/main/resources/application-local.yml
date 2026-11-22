@@ -23,10 +23,10 @@ spring:
   # Kafka from infra/docker-compose.yml.
   kafka:
     bootstrap-servers: localhost:9092
-# Human-readable logs locally; show the correlation ID on every line.
+# Human-readable logs locally; correlation ID, then trace and span ID (M12) on every line.
 logging:
   pattern:
-    correlation: "[%X{correlationId:-}] "
+    correlation: "[%X{correlationId:-}] [%X{traceId:-},%X{spanId:-}] "
 trustledger:
   security:
     # Vite dev server of the future web app (Keycloak client trustledger-web).
@@ -60,3 +60,8 @@ trustledger:
   payments:
     topups:
       checkout-page: true
+# Every request traced locally (M12): sampling 100% (the default is 10%).
+management:
+  tracing:
+    sampling:
+      probability: 1.0

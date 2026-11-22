@@ -54,3 +54,17 @@ spring:
       mail.smtp.connectiontimeout: 2000
       mail.smtp.timeout: 2000
       mail.smtp.writetimeout: 2000
+# Every span sampled, so tracing tests are deterministic. OTLP export stays off (main application.yml); the
+# tracing ITs add an InMemorySpanExporter (ADR 0020).
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  # Short export delay so TestTelemetry sees ended spans and log records quickly.
+  opentelemetry:
+    tracing:
+      export:
+        schedule-delay: 100ms
+    logging:
+      export:
+        schedule-delay: 100ms

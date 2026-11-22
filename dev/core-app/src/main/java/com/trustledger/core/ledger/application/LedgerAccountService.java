@@ -31,10 +31,13 @@ public class LedgerAccountService {
     private static final Logger log = LoggerFactory.getLogger(LedgerAccountService.class);
 
     private final LedgerAccountRepository accounts;
+    private final LedgerAccountDirectory directory;
     private final JournalLineRepository lines;
     private final Clock clock;
 
-    public LedgerAccountService(LedgerAccountRepository accounts, JournalLineRepository lines, Clock clock) {
+    public LedgerAccountService(LedgerAccountRepository accounts, LedgerAccountDirectory directory,
+            JournalLineRepository lines, Clock clock) {
+        this.directory = directory;
         this.accounts = accounts;
         this.lines = lines;
         this.clock = clock;
@@ -67,23 +70,27 @@ public class LedgerAccountService {
 
     /**
      * The balance on the account's normal side, summed from its journal lines (never from a cached column).
+     * <p>
+     * <b>Never cached</b> (ADR 0019): only the account's identity comes from the {@link LedgerAccountDirectory}
+     * cache; the sums are read from PostgreSQL on every call, so a posting is visible at once.
      *
      * @throws TrustLedgerException {@code NOT_FOUND} for an unknown code
      */
     @Transactional(readOnly = true)
     public AccountBalance balanceOf(String accountCode) {
         Objects.requireNonNull(accountCode, "accountCode");
-        LedgerAccount account = accounts.findByCode(accountCode)
+        LedgerAccountRef account = directory.findByCode(accountCode)
                 .orElseThrow(() -> new TrustLedgerException(ErrorCode.NOT_FOUND, "Ledger account not found."));
-        long debits = lines.sumAmount(account.getId(), Direction.DEBIT);
-        long credits = lines.sumAmount(account.getId(), Direction.CREDIT);
-        return new AccountBalance(account.getCode(), account.getNormalSide(), account.balanceFrom(debits, credits),
-                account.getCurrency());
+        long debits = lines.sumAmount(account.id(), Direction.DEBIT);
+        long credits = lines.sumAmount(account.id(), Direction.CREDIT);
+        return new AccountBalance(account.code(), account.normalSide(), account.balanceFrom(debits, credits),
+                account.currency());
     }
 
     /**
      * {@link #balanceOf} for many accounts with two queries in total (accounts, then grouped line totals), for
-     * reconciliation. Unknown codes are simply absent from the result.
+     * reconciliation. Unknown codes are simply absent from the result. Never cached (ADR 0019): reconciliation must
+     * compare against the ledger as it is now.
      */
     @Transactional(readOnly = true)
     public Map<String, AccountBalance> balancesOf(Collection<String> accountCodes) {
