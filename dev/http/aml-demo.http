@@ -1,0 +1,148 @@
+### AML demo (FR-AML-2 R2 "structuring" -> FR-AML-3 freeze). LOCAL ONLY, Razorpay TEST MODE, fake users only.
+# Walkthrough with SQL and Kafka commands: docs/aml-demo.md. Run the requests top to bottom.
+# Prerequisites:
+#   - core-app (8080) and risk-aml-service (8081) running with the local profile, infra from compose;
+#   - customer1 at FULL KYC (kyc.http), customer2 with at least a MIN wallet (auth.http "minimum KYC" as customer2);
+#   - environment "local" selected, password in http-client.private.env.json (see auth.http).
+# Tokens live 5 minutes: if a request says 401, run the token requests again.
+
+@token_url = {{keycloak}}/realms/{{realm}}/protocol/openid-connect/token
+# officer1 needs a fresh TOTP code: Git Bash, from dev/:  scripts/aml-demo-webhooks.sh totp
+@otp = 000000
+
+### 1. customer1: token
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=customer1&password={{password}}
+
+> {% client.global.set("customer1_token", response.body.access_token); %}
+
+### 2. customer2: token
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=customer2&password={{password}}
+
+> {% client.global.set("customer2_token", response.body.access_token); %}
+
+### 3. customer1: wallet -> 200 {tier FULL, status ACTIVE}; FULL allows ₹2,00,000 a month, enough for 3 x ₹46,000
+GET {{api}}/api/v1/wallets/me
+Authorization: Bearer {{customer1_token}}
+
+> {% client.global.set("sender_wallet_id", response.body.walletId); %}
+
+### 4. customer2: wallet (recipient of the transfer in step 9)
+GET {{api}}/api/v1/wallets/me
+Authorization: Bearer {{customer2_token}}
+
+> {% client.global.set("receiver_wallet_id", response.body.walletId); %}
+
+### 5a. customer1: top-up 1 of ₹46,000 -> 201 PENDING (inside R2's ₹45,000-₹49,999.99 band)
+# The Idempotency-Key makes a rerun return the SAME top-up. For a second demo run, generate new keys:
+# {{$random.uuid}} does that, but then a rerun creates a new top-up every time.
+POST {{api}}/api/v1/topups
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: {{$random.uuid}}
+Content-Type: application/json
+
+{"amount": "46000.00"}
+
+> {% client.global.set("topup1", response.body.id); %}
+
+### 5b. customer1: top-up 2 of ₹46,000 -> 201 PENDING
+POST {{api}}/api/v1/topups
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: {{$random.uuid}}
+Content-Type: application/json
+
+{"amount": "46000.00"}
+
+> {% client.global.set("topup2", response.body.id); %}
+
+### 5c. customer1: top-up 3 of ₹46,000 -> 201 PENDING
+POST {{api}}/api/v1/topups
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: {{$random.uuid}}
+Content-Type: application/json
+
+{"amount": "46000.00"}
+
+> {%
+  client.global.set("topup3", response.body.id);
+  client.log("Pay them (docs/aml-demo.md step 4). Fast way, Git Bash in dev/:");
+  client.log("scripts/aml-demo-webhooks.sh capture " + client.global.get("topup1") + " "
+      + client.global.get("topup2") + " " + response.body.id);
+%}
+
+### 6. STOP: pay the three top-ups now (docs/aml-demo.md step 4: checkout.html, or the webhook script).
+# Then: each top-up -> 200 CAPTURED
+GET {{api}}/api/v1/topups/{{topup3}}
+Authorization: Bearer {{customer1_token}}
+
+### 7. customer1: wallet a few seconds after the third capture -> 200 {status FROZEN, balance "138000.00"}
+# (outbox -> Kafka -> AML rule R2 -> aml.freeze_requests -> relay -> Kafka -> core-app freeze; about 1-3 s)
+GET {{api}}/api/v1/wallets/me
+Authorization: Bearer {{customer1_token}}
+
+### 8. A fourth top-up while frozen -> 409 WALLET_FROZEN (no Razorpay order is created)
+POST {{api}}/api/v1/topups
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: {{$random.uuid}}
+Content-Type: application/json
+
+{"amount": "100.00"}
+
+### 9. THE POINT OF THE DEMO: customer1 -> customer2 ₹100 -> 409 ProblemDetail {code WALLET_FROZEN}
+POST {{api}}/api/v1/transfers
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: {{$random.uuid}}
+Content-Type: application/json
+
+{"recipientWalletId": "{{receiver_wallet_id}}", "amount": "100.00", "note": "AML demo"}
+
+### --- The compliance side (risk-aml-service, port 8081) ---
+
+### 10. officer1: token (paste a fresh code into @otp first; valid 30 s, one login per code)
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=officer1&password={{password}}&totp={{otp}}
+
+> {% client.global.set("officer1_token", response.body.access_token); %}
+
+### 11. officer1: open cases for customer1's wallet -> 200 {content: [{status OPEN, highestSeverity HIGH}]}
+GET {{aml}}/api/v1/aml/cases?status=OPEN&walletId={{sender_wallet_id}}&page=0&size=20
+Authorization: Bearer {{officer1_token}}
+
+> {% client.global.set("aml_case_id", response.body.content[0].id); %}
+
+### 12. officer1: the case -> 200 {alerts [R2 HIGH], freezeRequests [{publishedAt set}], facts [3 x IN 46000.00]}
+GET {{aml}}/api/v1/aml/cases/{{aml_case_id}}
+Authorization: Bearer {{officer1_token}}
+
+### 13. STR export before escalation -> 409 INVALID_STATE_TRANSITION (only ESCALATED cases have a report)
+GET {{aml}}/api/v1/aml/cases/{{aml_case_id}}/str-report
+Authorization: Bearer {{officer1_token}}
+
+### 14. officer1: assign to self (empty body) -> 200 INVESTIGATING
+POST {{aml}}/api/v1/aml/cases/{{aml_case_id}}/assign
+Authorization: Bearer {{officer1_token}}
+Content-Type: application/json
+
+{}
+
+### 15. officer1: escalate -> 200 ESCALATED (closing as FALSE_POSITIVE would NOT unfreeze the wallet)
+POST {{aml}}/api/v1/aml/cases/{{aml_case_id}}/escalate
+Authorization: Bearer {{officer1_token}}
+Content-Type: application/json
+
+{"notes": "Three top-ups of 46,000 in one day, just under the 50,000 hold. Filing an STR."}
+
+### 16. officer1: STR report -> 200 text/csv, attachment; wallet and officer IDs masked to ****last4
+GET {{aml}}/api/v1/aml/cases/{{aml_case_id}}/str-report
+Authorization: Bearer {{officer1_token}}
+
+### 17. A customer on the AML API -> 403
+GET {{aml}}/api/v1/aml/cases
+Authorization: Bearer {{customer1_token}}
