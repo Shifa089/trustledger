@@ -155,7 +155,27 @@ integration tests, since both are compression codecs.
 - Alternatives: the marketplace actions, OWASP Dependency-Check, failing on HIGH, GitHub secret scanning.
 - Consequences: how to bump a digest, and how to run both scans locally.
 
-### 7. Verification status
+### 7. Test-order bug that CI exposed (an existing bug, fixed)
+
+- **What happened.** In the first CI run of this branch, both scan jobs passed but `./mvnw verify` failed with
+  3 × 500 on `GET /api/v1/compliance/kyc-cases`:
+  - `ComplianceKycIT` × 2
+  - `SecurityMatrixIT` (the officer row)
+
+  Locally the run had been green.
+- **The cause.** Failsafe runs test classes in filesystem order. On the Linux runner, adding the new test files
+  changed that order, and `ComplianceKycIT` then ran after the KYC migration tests:
+  - `KycDocumentMigrationIT` inserts a raw `FULL`/`SUBMITTED` case with `address_enc = 'ciphertext'`. That isn't
+    real ciphertext, so it can't be decrypted, and the test never deleted it. In the shared test database it then
+    sat in the officers' SUBMITTED queue. Listing the queue failed with `Decryption failed` → 500.
+  - `KycMigrationIT` also left raw cases behind (not encrypted, but visible in the queues).
+- **Proof.** Forcing the CI order locally (`-Dfailsafe.runOrder=reversealphabetical`) with the old code gave the
+  same 500. With the fix, all three classes pass.
+- **The fix.** Both migration tests now delete their raw rows in `@AfterEach`: documents first, then cases.
+- **Lesson.** A green run in one order proves little when tests share a database. Every test that writes raw rows
+  must clean them up, especially rows that bypass the domain (here, fake ciphertext).
+
+### 8. Verification status
 
 `./mvnw verify` **passed** on this branch, the whole reactor (BUILD SUCCESS):
 
@@ -165,8 +185,14 @@ integration tests, since both are compression codecs.
 | risk-aml-service | 107 | 62 (+4: `AmlEndpointAuthorizationCoverageIT`) |
 | event-contracts | 36 | |
 
-`ModularityTests` and `ArchitectureRulesTest` are green. The CI jobs themselves run for the first time on push;
-the local runs in §4 used the same images, digests and flags.
+`ModularityTests` and `ArchitectureRulesTest` are green.
+
+**CI, first push:**
+- `Trivy dependency scan`: success.
+- `gitleaks secret scan`: success.
+- `./mvnw verify`: failed on the test-order bug in §7, then fixed.
+
+After the fix, `./mvnw verify` passed locally again with the same counts (BUILD SUCCESS).
 
 ### What to learn from it
 
@@ -188,5 +214,8 @@ the local runs in §4 used the same images, digests and flags.
   those files. The same header anywhere else is still reported.
 - **Your scanners are supply chain too.** Pin by digest and avoid third-party actions, or the tool that checks your
   dependencies becomes the easiest dependency to compromise.
+- **Shared test databases make test order part of the test.** Adding files reshuffled the CI order and exposed a
+  leftover row from a test written weeks ago. A test that writes raw rows must delete them. Reproduce an
+  order-dependent failure by forcing the order (`-Dfailsafe.runOrder`) before you fix it.
 - **A checklist is only useful if it can fail.** `SecurityChecklistTest` turns the document into something CI
   checks: rename a cited test and the build tells you the evidence moved.

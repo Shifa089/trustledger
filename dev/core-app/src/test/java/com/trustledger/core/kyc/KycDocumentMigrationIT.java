@@ -7,6 +7,7 @@ import com.trustledger.core.TestcontainersConfiguration;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,17 @@ class KycDocumentMigrationIT {
         jdbc.update("""
                 insert into kyc.kyc_cases (id, user_id, level, status, address_enc, created_at, updated_at, version)
                 values (?, ?, 'FULL', 'SUBMITTED', 'ciphertext', ?, ?, 0)""", caseId, UUID.randomUUID(), now, now);
+    }
+
+    /**
+     * The raw case holds a fake {@code address_enc} that no key can decrypt. Left in the shared test database, it
+     * would sit in the officers' SUBMITTED queue and make every later listing fail with 500 (seen in CI when the
+     * class order changed).
+     */
+    @AfterEach
+    void removeTheRawCase() {
+        jdbc.update("delete from kyc.kyc_documents where case_id = ?", caseId);
+        jdbc.update("delete from kyc.kyc_cases where id = ?", caseId);
     }
 
     @Test
