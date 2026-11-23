@@ -11,6 +11,7 @@ Full spec: docs/SPEC.md. Read the relevant section before every task.
 - Integration tests only: ./mvnw verify -DskipUnitTests
 - Once before -pl runs (and after changing event-contracts): ./mvnw install -DskipTests
 - Run core app: ./mvnw -pl core-app spring-boot:run -Dspring-boot.run.profiles=local
+  (add ",demo" to seed customer1/customer2 with FULL KYC and balances)
 - Run AML service: ./mvnw -pl risk-aml-service spring-boot:run -Dspring-boot.run.profiles=local
 - Run both images instead (ADR 0022): docker compose -f infra/docker-compose.yml --profile apps up -d --build
 - Smoke test a running stack: scripts/smoke.sh

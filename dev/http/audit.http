@@ -1,0 +1,47 @@
+### Audit trail (FR-A-1, FR-A-2, M10, ADR 0008). Fake test data only. AUDITOR only.
+# Prerequisites: "auditor1: token" and "customer1: token" in auth.http (auditor1 needs no OTP).
+# Every state-changing action wrote one hash-chained row: hash = SHA-256(prev_hash || canonical JSON).
+
+@token_url = {{keycloak}}/realms/{{realm}}/protocol/openid-connect/token
+
+### auditor1: token (same as in auth.http, so this file also works on its own)
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=auditor1&password={{password}}
+
+> {% client.global.set("auditor1_token", response.body.access_token); %}
+
+### auditor1: walk the chain -> 200 {status OK, checkedEvents, lastSeq, lastHash} (Cache-Control: no-store)
+# After someone edits a row in SQL (the triggers refuse UPDATE, so a superuser would have to disable them first)
+# -> {status BROKEN, brokenSeq, reason HASH_MISMATCH | PREV_HASH_MISMATCH | UNREADABLE}. Keep lastHash somewhere
+# else: deleting the newest rows leaves a valid, shorter chain that only an outside copy of lastHash can reveal.
+GET {{api}}/api/v1/audit/verify
+Authorization: Bearer {{auditor1_token}}
+
+### auditor1: newest events first -> 200 {items:[{seq, occurredAt, actorId, actorRole, action, entityType, entityId,
+#   before, after, ip, userAgent, correlationId, prevHash, hash}], page, size, totalElements, totalPages}
+GET {{api}}/api/v1/audit/events?page=0&size=20
+Authorization: Bearer {{auditor1_token}}
+
+> {% if (response.body.items.length > 0) client.global.set("audit_entity_id", response.body.items[0].entityId); %}
+
+### auditor1: filters: one action in a time window ([from, to), ISO-8601 instants)
+GET {{api}}/api/v1/audit/events?action=WALLET_FREEZE&from=2026-11-01T00:00:00Z&to=2026-12-01T00:00:00Z
+Authorization: Bearer {{auditor1_token}}
+
+### auditor1: everything about one entity (entityType + entityId), e.g. a wallet or a transfer
+GET {{api}}/api/v1/audit/events?entityId={{audit_entity_id}}
+Authorization: Bearer {{auditor1_token}}
+
+### A customer can't read the audit trail -> 403 ACCESS_DENIED
+GET {{api}}/api/v1/audit/verify
+Authorization: Bearer {{customer1_token}}
+
+### No token -> 401
+GET {{api}}/api/v1/audit/events
+
+### NOT BUILT YET (SPEC §5): ledger-derived balance of one account, ADMIN or AUDITOR. SecurityConfig already has its
+# role rule, so an auditor passes security and gets 404 NOT_FOUND (no handler); a customer gets 403.
+GET {{api}}/api/v1/admin/ledger/accounts/PLATFORM:SUSPENSE/balance
+Authorization: Bearer {{auditor1_token}}

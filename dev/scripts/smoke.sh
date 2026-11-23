@@ -13,8 +13,9 @@
 #      available balance drops by exactly that amount, the same Idempotency-Key replays without moving money
 #      again, and the recipient can read the transfer.
 #
-# Prerequisites (fake test users only, docs/aml-demo.md): customer1 and customer2 have FULL KYC (FULL wallets) and
-# customer1 has at least SMOKE_AMOUNT available. Needs Git Bash (or any bash) with curl and openssl. Run from dev/.
+# Prerequisites (fake test users only): customer1 and customer2 have FULL wallets that aren't frozen, and customer1
+# has at least SMOKE_AMOUNT available. The Spring profile "demo" seeds exactly that (README "Run locally"; the compose
+# profile "apps" runs core-app with it). Needs Git Bash (or any bash) with curl and openssl. Run from dev/.
 # Reads SMOKE_PASSWORD, else TRUSTLEDGER_DEV_USER_PASSWORD from the environment or .env; never prints a secret,
 # a token or personal data.
 #
@@ -25,7 +26,7 @@
 #   SMOKE_CLIENT_ID       Keycloak client for the password grant (default trustledger-dev)
 #   SMOKE_SENDER / SMOKE_RECIPIENT  test users        (default customer1 / customer2)
 #   SMOKE_PASSWORD        their password              (default TRUSTLEDGER_DEV_USER_PASSWORD)
-#   Example with the seeded load-test users (load-tests/README.md), whose wallets AML demos never froze:
+#   Example with the seeded load-test users (profile "perf", load-tests/README.md) instead:
 #     SMOKE_SENDER=perf001 SMOKE_RECIPIENT=perf002 SMOKE_CLIENT_ID=trustledger-perf \
 #       SMOKE_PASSWORD="$(sed -n 's/^TRUSTLEDGER_PERF_USER_PASSWORD=//p' .env)" scripts/smoke.sh
 #   SMOKE_AMOUNT          rupees, two decimals         (default 1.00)
@@ -161,7 +162,7 @@ main() {
         || die "core-app not reachable"
     if [[ "$STATUS" != "201" ]]; then
         [[ "$BODY" != *WALLET_FROZEN* ]] \
-            || echo "smoke: hint: an AML demo froze this wallet; use other users (SMOKE_SENDER, see the header)" >&2
+            || echo "smoke: hint: an AML demo froze this wallet; unfreeze it (wallet.http) or use other users (header)" >&2
         die "POST /api/v1/transfers -> HTTP $STATUS: $BODY"
     fi
     [[ "$(json_field status "$BODY")" == "COMPLETED" ]] || die "transfer not COMPLETED: $BODY"

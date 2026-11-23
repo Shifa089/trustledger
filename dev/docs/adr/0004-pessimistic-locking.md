@@ -96,3 +96,12 @@ Option 3, with these rules:
 - **Tests must create real contention.** Each concurrency test submits all tasks to an `ExecutorService`, has
   them wait on one `CountDownLatch`, then releases them together, with a 60 s overall timeout so a hang fails
   the build instead of blocking it.
+
+## Code check (2026-11-23, Day 25 B, M16)
+
+The locking matches the code (`JpaWalletRepository`: `PESSIMISTIC_WRITE` with `ORDER BY id`;
+`TransferRepository.findByIdForUpdate` before the wallets; the three ITs named above). One promise is **still open**:
+no `lock_timeout` was set in M13. Lock waits are still unbounded. The k6 runs (docs/perf.md) never showed a long
+wait, because the lock holders make no remote calls, but a bug that holds a lock would stall requests instead of
+failing them. Follow-up: `SET LOCAL lock_timeout = '5s'` in the money transactions, with an IT that a waiting
+transfer fails with a clean 409/503 instead of hanging.

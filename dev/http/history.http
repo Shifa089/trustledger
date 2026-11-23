@@ -1,0 +1,36 @@
+### Transaction history (FR-S-1, M11) and statements. Fake test data only.
+# Prerequisites: "customer1: token" in auth.http (or demo.http), and a few transfers or top-ups to list.
+# One row per money movement of the caller's wallet: transfers sent and received, top-ups. Amounts are decimal strings.
+
+### customer1: newest first, first page -> 200 {items:[{id, type, status, amount, currency, counterpartyWalletId,
+#   note, createdAt}], page 0, size, totalElements, totalPages}
+GET {{api}}/api/v1/wallets/me/transactions?page=0&size=20
+Authorization: Bearer {{customer1_token}}
+
+### customer1: only outgoing transfers in November (yyyy-MM-dd, Asia/Kolkata days, both included), oldest first
+GET {{api}}/api/v1/wallets/me/transactions?type=TRANSFER_OUT&from=2026-11-01&to=2026-11-30&sort=createdAt,asc
+Authorization: Bearer {{customer1_token}}
+
+### customer1: keyset pagination for long histories (empty cursor = first slice; always newest first, no page/sort)
+# -> 200 {items, size, nextCursor}: no totals; nextCursor is absent on the last slice.
+# Pass the returned nextCursor as ?cursor=... to get the next slice.
+GET {{api}}/api/v1/wallets/me/transactions?size=10&cursor=
+Authorization: Bearer {{customer1_token}}
+
+> {% if (response.body.nextCursor) client.global.set("history_cursor", response.body.nextCursor); %}
+
+### customer1: the next slice
+GET {{api}}/api/v1/wallets/me/transactions?size=10&cursor={{history_cursor}}
+Authorization: Bearer {{customer1_token}}
+
+### Bad page size -> 400 VALIDATION_FAILED (bounds: trustledger.paging)
+GET {{api}}/api/v1/wallets/me/transactions?size=100000
+Authorization: Bearer {{customer1_token}}
+
+### An officer on the customer endpoint -> 403 ACCESS_DENIED
+GET {{api}}/api/v1/wallets/me/transactions
+Authorization: Bearer {{officer1_token}}
+
+### NOT BUILT YET (SPEC §5, README "Not yet built"): monthly PDF statement -> 404 NOT_FOUND today
+GET {{api}}/api/v1/wallets/me/statements/2026-11
+Authorization: Bearer {{customer1_token}}

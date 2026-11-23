@@ -183,3 +183,11 @@ entity type, entity ID, actor, action and a half-open `[from, to)` range on `occ
 `trustledger.paging`. V20 adds indexes on `(actor_id, seq)` and `occurred_at`. Both endpoints are AUDITOR only.
 
 Dependency: `spring-boot-starter-aspectj` for the aspect (ADR 0018).
+
+## Code check (2026-11-23, Day 25 B, M16)
+
+Matches the code: `CanonicalJson`, the advisory lock key `0x544C_5F41_5544_4954` ("TL_AUDIT") in
+`JdbcAuditEventStore`, unique `hash` and `prev_hash`, `ChainVerifier`, the nine `@Audited` endpoints (KYC verify,
+approve, reject, document view; wallet freeze, unfreeze; transfer approve, reject; reconciliation run). Anchoring
+`lastHash` outside the database is still out of scope. The seeders (`perf`, `demo`) write test data with SQL and so
+write **no** audit rows: they are not state changes by an actor.

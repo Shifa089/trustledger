@@ -1,0 +1,10 @@
+# Demo profile (M16). Use together with "local": -Dspring-boot.run.profiles=local,demo
+# Seeds customer1 and customer2 (Keycloak IDs fixed in infra/keycloak/realm-trustledger.json) with approved FULL KYC
+# and ledger-backed balances, so the money path can be shown without a KYC review or a Razorpay payment first.
+# Fake test data only; never activate outside a developer machine.
+trustledger:
+  demo:
+    seed:
+      # customer1 sends. ₹50,000 leaves room under the FULL cap (₹2,00,000) for the AML demo's three ₹46,000 top-ups.
+      customer1-balance: "50000.00"
+      customer2-balance: "10000.00"

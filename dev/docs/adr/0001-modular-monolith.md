@@ -64,3 +64,10 @@ The team is one developer, with one deployment target and a limited budget.
   review; cross-module reads go through APIs, which can mean extra queries.
 - Negative: one shared PostgreSQL database is a single point of failure for the core
   (acceptable for this project; production would use a managed, multi-AZ setup).
+
+## Code check (2026-11-23, Day 25 B, M16)
+
+Matches the code. The ten modules exist as top-level packages of `com.trustledger.core`; `ModularityTests` (Spring
+Modulith `verify`) and `ArchitectureRulesTest` (ArchUnit, ADR 0015) run on every build; `risk-aml-service` talks to
+core-app only through the `event-contracts` records on Kafka. Test-data seeders (`shared.perf`, `shared.demo`, both
+on `shared.seed`) write SQL only and depend on no business module.

@@ -173,3 +173,11 @@ name, so a status added later on the AML side needs no change in core-app.
 acceptable because AML cases come from transfers the AML service already processed asynchronously, and because
 erasure never touches the ledger, the transfers or the audit trail an investigation relies on. Cases opened before
 this release need a one-off backfill in a real deployment; local and test data start empty.
+
+## Code check (2026-11-23, Day 25 B, M16)
+
+Matches the code: own `aml` schema and Flyway, `processed_events` claim, 3 attempts then `<topic>.DLT`,
+`FreezeRequestRelay` and `CaseEventRelay` outboxes, the case workflow with `NOT_CASE_ASSIGNEE`, the STR CSV.
+`GET /aml/alerts` and `POST /aml/cases/{id}/ai-summary` (optional M15) are **not built** and are refused by the
+deny-all rule (`AmlSecurityIT`). **Still open** from "M12": no alert on DLT traffic or on freeze requests stuck in
+the outbox.

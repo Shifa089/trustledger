@@ -65,3 +65,15 @@ Use **Keycloak 26** (same image locally, in Testcontainers and later on AWS) wit
     authenticated `/api/**` request; it also puts our `userId` into the log MDC.
 - On AWS the issuer URL changes; only `spring.security.oauth2.resourceserver.jwt.issuer-uri` and the
   clients' redirect URIs differ per environment.
+
+## Code check (2026-11-23, Day 25 B, M16)
+
+Matches the code: Keycloak 26.8.2 in compose and Testcontainers, the realm file imported at startup, 5-minute access
+tokens, rotating refresh tokens (`revokeRefreshToken`, `refreshTokenMaxReuse: 0`), brute-force protection, OTP by
+role. `KeycloakRealmIT` proves all of it against the real realm file. Two later additions:
+
+- **Fixed Keycloak IDs for customer1 and customer2** (`de300001-0000-4000-8000-00000000000n`). The `demo` profile
+  (M16) seeds their wallets under these subjects, so their tokens find the seeded rows, as the perf users already did
+  (M13). The realm file only applies at import: a Keycloak container created earlier needs
+  `--force-recreate keycloak`, after which `load-tests/keycloak-perf-users.sh` has to be run again.
+- **Optional `jwk-set-uri`** (ADR 0022): containers fetch keys from `keycloak:8080` while the issuer check is unchanged.

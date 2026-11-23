@@ -67,8 +67,9 @@ Content-Type: application/json
 
 {"consents":[{"purpose":"TERMS","policyVersion":"2026-11-01","granted":false}]}
 
-### customer1: transfer stub -> 501 NOT_IMPLEMENTED (until M6). Run 21 times within a minute:
-### the 21st gets 429 RATE_LIMITED with Retry-After. X-RateLimit-Remaining counts down.
+### customer1: rate limit. A transfer without a body -> 400 VALIDATION_FAILED (no money moves). Run 21 times within
+### a minute: the 21st gets 429 RATE_LIMITED with Retry-After. X-RateLimit-Remaining counts down (20/min on POST
+### /transfers and /topups together, 100/min on everything else).
 POST {{api}}/api/v1/transfers
 Authorization: Bearer {{customer1_token}}
 

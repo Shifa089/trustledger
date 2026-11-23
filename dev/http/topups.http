@@ -47,3 +47,23 @@ Authorization: Bearer {{customer1_token}}
 Content-Type: application/json
 
 {"amount": "500.00"}
+
+### --- Razorpay webhook (FR-P-5): public, no token, HMAC-SHA256 over the RAW body ---
+# A valid delivery needs RAZORPAY_WEBHOOK_SECRET, which this collection never holds. Two ways to send a real one:
+#   - pay the top-up on http://localhost:8080/checkout.html through a tunnel (docs/e2e-razorpay.md), or
+#   - Git Bash, from dev/:  scripts/aml-demo-webhooks.sh capture {{topup_id}}  (signs a payment.captured locally).
+# Then GET /topups/{id} above shows CAPTURED and GET /wallets/me the credited balance.
+
+### Wrong signature -> 400 WEBHOOK_SIGNATURE_INVALID (stored as a rejected delivery; nothing is credited)
+POST {{api}}/api/v1/webhooks/razorpay
+Content-Type: application/json
+X-Razorpay-Signature: 0000000000000000000000000000000000000000000000000000000000000000
+X-Razorpay-Event-Id: evt_http_collection_bad_signature
+
+{"event":"payment.captured","payload":{"payment":{"entity":{"id":"pay_Fake","order_id":"order_Fake","amount":50000,"currency":"INR","status":"captured"}}}}
+
+### No signature header -> 400 WEBHOOK_SIGNATURE_INVALID
+POST {{api}}/api/v1/webhooks/razorpay
+Content-Type: application/json
+
+{"event":"payment.captured"}
