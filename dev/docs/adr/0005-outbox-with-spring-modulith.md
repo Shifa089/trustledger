@@ -112,3 +112,11 @@ by the job) so a recent send can still be looked up when a consumer reports a pr
 Testcontainers BOM): exactly one record per event, keyed by wallet, contract JSON, headers, no internal fields;
 nothing for a rolled-back transfer; the broker paused during a transfer, then the restart hook sends the stored event
 with the same `eventId`; topics created; cleanup deletes only old completed rows.
+
+## Code check (2026-11-23, Day 25 B, M16)
+
+Matches the code: V16 from Modulith 2.1.2 (the version in the parent pom), `republish-outstanding-events-on-restart`,
+`EventPublicationCleanupJob` with `trustledger.events.retention: 7d`, `EventExternalizationConfig`, the ITs named
+above. **Still open:** M12 did not add a running resubmission of `FAILED` publications or an alert on old incomplete
+ones. A failed send still waits for the next restart. Day 25 A showed the cost: starting the containers republished
+the leftover load-test events, and the AML service processed them all at once.

@@ -1,0 +1,74 @@
+### AML case workflow (FR-AML-2, FR-AML-4, M9, ADR 0007), risk-aml-service on port 8081. COMPLIANCE_OFFICER only.
+# Fake test data only. aml-demo.http is the story (structuring -> freeze -> escalate -> STR); this file has the other
+# branch, closing a false positive, and the filters.
+# Prerequisites: "officer1: token" and "customer1: token" in auth.http (officer1 needs a fresh TOTP code:
+#   scripts/aml-demo-webhooks.sh totp), and at least one OPEN case (any rule hit, e.g. the AML demo or a k6 run).
+# Workflow: OPEN -> INVESTIGATING (assign) -> CLOSED_FALSE_POSITIVE (close) or ESCALATED (escalate). Anything else is
+# 409 INVALID_STATE_TRANSITION; only the assigned officer may finish a case (409 NOT_CASE_ASSIGNEE).
+
+### officer1: all cases, oldest first (a queue) -> 200 {content:[{id, walletId, status, highestSeverity, ...}], page, size, ...}
+GET {{aml}}/api/v1/aml/cases?page=0&size=20
+Authorization: Bearer {{officer1_token}}
+
+### officer1: open cases only (status: OPEN, INVESTIGATING, CLOSED_FALSE_POSITIVE, ESCALATED; walletId also filters)
+GET {{aml}}/api/v1/aml/cases?status=OPEN&page=0&size=20
+Authorization: Bearer {{officer1_token}}
+
+> {% if (response.body.content.length > 0) client.global.set("fp_case_id", response.body.content[0].id); %}
+
+### officer1: the case with its alerts, freeze requests and transaction facts
+GET {{aml}}/api/v1/aml/cases/{{fp_case_id}}
+Authorization: Bearer {{officer1_token}}
+
+### Closing an OPEN case without taking it first -> 409 INVALID_STATE_TRANSITION
+POST {{aml}}/api/v1/aml/cases/{{fp_case_id}}/close
+Authorization: Bearer {{officer1_token}}
+Content-Type: application/json
+
+{"resolution": "FALSE_POSITIVE", "notes": "Salary and rent, documented by the customer."}
+
+### officer1: assign to self (empty body; {"assigneeId": "..."} reassigns) -> 200 INVESTIGATING
+POST {{aml}}/api/v1/aml/cases/{{fp_case_id}}/assign
+Authorization: Bearer {{officer1_token}}
+Content-Type: application/json
+
+{}
+
+### Notes are required -> 400 VALIDATION_FAILED
+POST {{aml}}/api/v1/aml/cases/{{fp_case_id}}/close
+Authorization: Bearer {{officer1_token}}
+Content-Type: application/json
+
+{"resolution": "FALSE_POSITIVE", "notes": ""}
+
+### officer1: close as a false positive -> 200 CLOSED_FALSE_POSITIVE
+# This does NOT unfreeze the wallet: that stays a separate officer action in core-app
+# (POST /api/v1/compliance/wallets/{id}/unfreeze, wallet.http), with its own reason and audit row.
+POST {{aml}}/api/v1/aml/cases/{{fp_case_id}}/close
+Authorization: Bearer {{officer1_token}}
+Content-Type: application/json
+
+{"resolution": "FALSE_POSITIVE", "notes": "Salary and rent, documented by the customer."}
+
+### Escalating a closed case -> 409 INVALID_STATE_TRANSITION
+POST {{aml}}/api/v1/aml/cases/{{fp_case_id}}/escalate
+Authorization: Bearer {{officer1_token}}
+Content-Type: application/json
+
+{"notes": "Too late: the case is closed."}
+
+### A closed case has no STR report -> 409 INVALID_STATE_TRANSITION (aml-demo.http step 16 shows a real one)
+GET {{aml}}/api/v1/aml/cases/{{fp_case_id}}/str-report
+Authorization: Bearer {{officer1_token}}
+
+### A customer on the AML API -> 403
+GET {{aml}}/api/v1/aml/cases/{{fp_case_id}}
+Authorization: Bearer {{customer1_token}}
+
+### NOT BUILT YET (SPEC §5): alert search by rule, severity and wallet -> 403 today (no security rule, so denied)
+GET {{aml}}/api/v1/aml/alerts?rule=R2&severity=HIGH
+Authorization: Bearer {{officer1_token}}
+
+### NOT BUILT YET (SPEC §5, optional M15): AI-drafted case summary -> 403 today (no security rule, so denied)
+POST {{aml}}/api/v1/aml/cases/{{fp_case_id}}/ai-summary
+Authorization: Bearer {{officer1_token}}

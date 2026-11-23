@@ -63,3 +63,9 @@ Option 4.
   (e.g. `RoundingMode.HALF_EVEN` once, at the end). None are in scope today.
 - Clients must send strings, not numbers: request records for money endpoints (M6 transfers, M7 top-ups)
   declare amounts as `String` and parse them with `Money.parse`, so a client's float rounding can't slip in.
+
+## Code check (2026-11-23, Day 25 B, M16)
+
+Matches the code: `shared.Money` (`long amountMinor`, `Math.addExact`/`subtractExact`, refuses currencies without 2
+minor digits), `Money.parse` without rounding, `MoneyPropertyConverter` for configuration (also the `perf` and `demo`
+seed balances), `bigint *_minor` columns. ArchUnit forbids `double`/`float` in money code.

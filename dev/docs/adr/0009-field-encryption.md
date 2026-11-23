@@ -122,3 +122,11 @@ master key, and the service holds only the decrypted data key in memory.
     follow-up), until then an erased customer can still sign in, but sees an empty profile and a closed wallet.
   - Cases opened before this release reach core-app only once the AML service sends an event for them. Locally and
     in tests that history is empty; a real deployment would need a one-off backfill.
+
+## Code check (2026-11-23, Day 25 B, M16)
+
+Matches the code: `AesGcmCipher`, `EncryptedStringConverter`, `EncryptedLocalDateConverter`, `BlindIndex`, keys from
+`TRUSTLEDGER_CRYPTO_KEY` / `TRUSTLEDGER_CRYPTO_INDEX_KEY`, `ck_users_erased_has_no_personal_data` (V23),
+`ErasureService`. **Not built yet** (they belong to the AWS half of M14): the KMS data key (envelope encryption; the
+key still comes from the environment), and the retention job for KYC records. The Keycloak account of an erased
+customer is still not disabled. The `demo` and `perf` seeds store no personal data at all, so they need no key.

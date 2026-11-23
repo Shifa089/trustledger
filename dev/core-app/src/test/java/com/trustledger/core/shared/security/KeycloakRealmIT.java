@@ -13,6 +13,7 @@ import com.trustledger.core.KeycloakContainer;
 import com.trustledger.core.KeycloakTokens;
 import com.trustledger.core.KeycloakTokens.TokenResponse;
 import com.trustledger.core.TestcontainersConfiguration;
+import com.trustledger.core.shared.demo.DemoSeedIds;
 import com.trustledger.core.shared.web.CorrelationIdFilter;
 import java.net.http.HttpResponse;
 import java.time.Instant;
@@ -112,6 +113,15 @@ class KeycloakRealmIT {
     @ValueSource(strings = {"customer1", "auditor1"})
     void nonStaffNeedNoOtp(String username) {
         assertThat(accessToken(username)).isNotBlank();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2})
+    void demoCustomersHaveTheKeycloakIdsTheDemoProfileSeeds(int n) {
+        // M16: the "demo" profile seeds wallets under these subjects; a different sub would find no wallet.
+        JsonNode claims = KeycloakTokens.claims(accessToken(DemoSeedIds.username(n)));
+
+        assertThat(claims.path("sub").asString()).isEqualTo(DemoSeedIds.subject(n));
     }
 
     @Test

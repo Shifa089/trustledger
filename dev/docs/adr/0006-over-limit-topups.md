@@ -85,3 +85,9 @@ V15 adds PARKED to the status check and requires a payment ID and journal entry 
 - The SUSPENSE balance should be watched: a metric and alert on PARKED top-ups belong to M12 (observability).
 - AML (M9) sees only credited top-ups (`TopupCaptured`). Parked money never reached the wallet; if AML needs it,
   a `TopupParked` event can be added then.
+
+## Code check (2026-11-23, Day 25 B, M16)
+
+Matches the code (`TopupSettlementService.capture`, `TopupLimitChecker.checkCapture`, V15, status PARKED). M12 added
+the metric `trustledger_topups_total{status="PARKED"}` on the Grafana dashboard; **no alert rule** exists yet, and the
+manual settlement of parked money still has no endpoint.

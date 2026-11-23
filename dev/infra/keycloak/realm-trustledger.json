@@ -195,6 +195,7 @@
   ],
   "users": [
     {
+      "id": "de300001-0000-4000-8000-000000000001",
       "username": "customer1",
       "enabled": true,
       "emailVerified": true,
@@ -205,6 +206,7 @@
       "realmRoles": ["CUSTOMER"]
     },
     {
+      "id": "de300001-0000-4000-8000-000000000002",
       "username": "customer2",
       "enabled": true,
       "emailVerified": true,

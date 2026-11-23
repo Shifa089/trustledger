@@ -145,6 +145,8 @@ services:
   # instead of localhost). Stop any spring-boot:run first (same ports 8080/8081). Build and start:
   #   docker compose -f infra/docker-compose.yml --profile apps up -d --build
   #   scripts/smoke.sh
+  # core-app also runs the Spring profile "demo": customer1/customer2 get seeded FULL wallets. Their Keycloak IDs are
+  # fixed in keycloak/realm-trustledger.json, so a Keycloak container created before that needs --force-recreate.
   # Tokens are requested from http://localhost:8180, so their iss is that URL, which the app keeps checking; only
   # the keys are fetched over the compose network (jwk-set-uri), since localhost inside a container is the container.
   core-app:
@@ -155,7 +157,8 @@ services:
     profiles: ["apps"]
     env_file: ../.env
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      # "demo" seeds customer1/customer2 with FULL KYC and balances (M16), so scripts/smoke.sh works out of the box.
+      SPRING_PROFILES_ACTIVE: local,demo
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/$${POSTGRES_DB}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:19092

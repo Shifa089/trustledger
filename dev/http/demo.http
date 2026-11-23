@@ -1,0 +1,89 @@
+### Demo tour (M16): the money path with the "demo" profile's seeded data. LOCAL ONLY, fake users only.
+# Prerequisites:
+#   - core-app started with the profiles local,demo (README "Run locally"); the compose profile "apps" does that;
+#   - Keycloak (re)created after Day 25 B, so customer1/customer2 have the fixed IDs the seed uses
+#     (docker compose -f infra/docker-compose.yml up -d --force-recreate keycloak);
+#   - environment "local" selected, password in http-client.private.env.json (see auth.http).
+# The seed gives customer1 ₹50,000 and customer2 ₹10,000, both FULL KYC (approved by two different fake officers).
+# The seeded users hold no personal data, so /me shows e-mail and name as null.
+
+@token_url = {{keycloak}}/realms/{{realm}}/protocol/openid-connect/token
+
+### 1. customer1: token
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=customer1&password={{password}}
+
+> {% client.global.set("customer1_token", response.body.access_token); %}
+
+### 2. customer2: token
+POST {{token_url}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=trustledger-dev&username=customer2&password={{password}}
+
+> {% client.global.set("customer2_token", response.body.access_token); %}
+
+### 3. customer1: profile -> 200 {status ACTIVE, roles [CUSTOMER]}
+GET {{api}}/api/v1/me
+Authorization: Bearer {{customer1_token}}
+
+### 4. customer1: KYC -> 200 {currentLevel FULL}
+GET {{api}}/api/v1/kyc/me
+Authorization: Bearer {{customer1_token}}
+
+### 5. customer1: wallet -> 200 {tier FULL, status ACTIVE, balance "50000.00" (less what earlier demos moved)}
+GET {{api}}/api/v1/wallets/me
+Authorization: Bearer {{customer1_token}}
+
+### 6. customer2: wallet (the recipient)
+GET {{api}}/api/v1/wallets/me
+Authorization: Bearer {{customer2_token}}
+
+> {% client.global.set("demo_recipient_wallet_id", response.body.walletId); %}
+
+### 7. customer1 -> customer2 ₹1,500 -> 201 {status COMPLETED}
+# A fresh key on every run of this step; steps 8 and 9 reuse it.
+< {% client.global.set("demo_key", $random.uuid); %}
+POST {{api}}/api/v1/transfers
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: {{demo_key}}
+Content-Type: application/json
+
+{"recipientWalletId": "{{demo_recipient_wallet_id}}", "amount": "1500.00", "note": "demo"}
+
+> {% client.global.set("demo_transfer_id", response.body.id); %}
+
+### 8. The same request again (a client retry) -> 201, the SAME transfer, header Idempotent-Replayed: true, no 2nd debit
+POST {{api}}/api/v1/transfers
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: {{demo_key}}
+Content-Type: application/json
+
+{"recipientWalletId": "{{demo_recipient_wallet_id}}", "amount": "1500.00", "note": "demo"}
+
+### 9. Same key, different body -> 422 IDEMPOTENCY_KEY_REUSED
+POST {{api}}/api/v1/transfers
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: {{demo_key}}
+Content-Type: application/json
+
+{"recipientWalletId": "{{demo_recipient_wallet_id}}", "amount": "9999.00", "note": "demo"}
+
+### 10. customer2 reads the transfer -> 200; anyone else would get the same 404 as an unknown ID
+GET {{api}}/api/v1/transfers/{{demo_transfer_id}}
+Authorization: Bearer {{customer2_token}}
+
+### 11. customer1: history -> the TRANSFER_OUT of ₹1,500 on top
+GET {{api}}/api/v1/wallets/me/transactions?page=0&size=5
+Authorization: Bearer {{customer1_token}}
+
+### 12. More than customer1 has available -> 422 INSUFFICIENT_FUNDS, nothing moves (transfers.http has the
+###     ₹50,000 high-value hold and the officer review)
+POST {{api}}/api/v1/transfers
+Authorization: Bearer {{customer1_token}}
+Idempotency-Key: {{$random.uuid}}
+Content-Type: application/json
+
+{"recipientWalletId": "{{demo_recipient_wallet_id}}", "amount": "49999.00", "note": "demo too much"}
