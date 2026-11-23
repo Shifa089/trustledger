@@ -16,6 +16,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,10 +29,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * AML case workflow (FR-AML-4, SPEC §5 "AML service"): {@code /api/v1/aml/cases/...}, COMPLIANCE_OFFICER only
- * (SecurityConfig). Illegal steps are 409 ProblemDetails from the domain.
+ * (SecurityConfig, repeated here by {@code @PreAuthorize}). Illegal steps are 409 ProblemDetails from the domain.
  */
 @RestController
 @RequestMapping("/aml/cases")
+@PreAuthorize("hasRole('COMPLIANCE_OFFICER')")
 class AmlCaseController {
 
     static final MediaType TEXT_CSV = new MediaType("text", "csv", StandardCharsets.UTF_8);

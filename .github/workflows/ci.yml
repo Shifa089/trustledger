@@ -57,3 +57,85 @@ jobs:
             dev/**/target/surefire-reports/
             dev/**/target/failsafe-reports/
           retention-days: 7
+
+  # Dependency scan (M13, ADR 0021): Trivy over the two Spring Boot jars, so it sees the library versions that
+  # were really resolved and shipped (BOOT-INF/lib), not what the poms suggest. Fails on a CRITICAL vulnerability
+  # that has a fixed version. Trivy runs from its official image pinned by digest, never a movable tag or action.
+  dependency-scan:
+    name: Trivy dependency scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TRIVY_IMAGE: aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Temurin 25 with Maven cache
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: dev/**/pom.xml
+
+      - name: Build the application jars
+        run: |
+          ./mvnw -B -ntp package -DskipTests
+          mkdir -p "$RUNNER_TEMP/scan"
+          cp core-app/target/core-app-*.jar risk-aml-service/target/risk-aml-service-*.jar "$RUNNER_TEMP/scan/"
+          ls -l "$RUNNER_TEMP/scan"
+
+      - name: Cache the Trivy vulnerability databases
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/trivy-cache
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+
+      - name: Report HIGH and CRITICAL (does not fail)
+        run: |
+          docker run --rm \
+            -v "$RUNNER_TEMP/scan:/scan:ro" -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+            -v "$PWD/.trivyignore:/config/.trivyignore:ro" \
+            "$TRIVY_IMAGE" rootfs /scan --scanners vuln --severity HIGH,CRITICAL --no-progress \
+            --ignorefile /config/.trivyignore --exit-code 0 | tee "$RUNNER_TEMP/trivy-report.txt"
+
+      - name: Fail on CRITICAL vulnerabilities with a fix
+        run: |
+          docker run --rm \
+            -v "$RUNNER_TEMP/scan:/scan:ro" -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+            -v "$PWD/.trivyignore:/config/.trivyignore:ro" \
+            "$TRIVY_IMAGE" rootfs /scan --scanners vuln --severity CRITICAL --ignore-unfixed --no-progress \
+            --ignorefile /config/.trivyignore --skip-db-update --skip-java-db-update --exit-code 1
+
+      - name: Upload the Trivy report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-report
+          path: ${{ runner.temp }}/trivy-report.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Secret scan (M13, ADR 0021): gitleaks over the whole history of every branch, not only the latest commit, since
+  # a secret deleted in a later commit is still in Git. Allowlisted false positives live in /.gitleaks.toml.
+  secret-scan:
+    name: gitleaks secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+
+    steps:
+      - name: Checkout the full history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Scan every commit on every branch
+        working-directory: .
+        run: |
+          docker run --rm -v "$PWD:/repo" "$GITLEAKS_IMAGE" \
+            git /repo --config /repo/.gitleaks.toml --log-opts=--all --redact --no-banner --exit-code 1

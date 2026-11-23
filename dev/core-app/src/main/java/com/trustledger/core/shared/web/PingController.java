@@ -2,6 +2,7 @@ package com.trustledger.core.shared.web;
 
 import com.trustledger.core.shared.security.Role;
 import java.util.List;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +19,7 @@ public class PingController {
     public record Pong(String status, String subject, List<String> roles) {
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping(path = "/ping", version = "1")
     Pong ping(Authentication authentication) {
         List<String> roles = authentication.getAuthorities().stream()

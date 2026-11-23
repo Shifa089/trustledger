@@ -361,25 +361,7 @@ class SecurityMatrixIT {
                         containsString(CorrelationIdFilter.HEADER)));
     }
 
-    @Test
-    void securityHeadersAreSet() throws Exception {
-        mvc.perform(get("/api/v1/ping").with(token("CUSTOMER")).secure(true))
-                .andExpect(status().isOk())
-                .andExpect(header().string("Content-Security-Policy", SecurityConfig.API_CSP))
-                .andExpect(header().string("X-Frame-Options", "DENY"))
-                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
-                .andExpect(header().string("Referrer-Policy", "no-referrer"))
-                .andExpect(header().string("Strict-Transport-Security", "max-age=31536000 ; includeSubDomains"))
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-store")));
-    }
-
-    @Test
-    void errorResponsesCarrySecurityHeadersToo() throws Exception {
-        mvc.perform(get("/api/v1/admin/probe"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(header().string("Content-Security-Policy", SecurityConfig.API_CSP))
-                .andExpect(header().string("X-Content-Type-Options", "nosniff"));
-    }
+    // Security headers on every kind of response: SecurityHeadersIT (M13).
 
     @Test
     void isStatelessNoSessionNoCookie() throws Exception {
