@@ -12,6 +12,8 @@ Full spec: docs/SPEC.md. Read the relevant section before every task.
 - Once before -pl runs (and after changing event-contracts): ./mvnw install -DskipTests
 - Run core app: ./mvnw -pl core-app spring-boot:run -Dspring-boot.run.profiles=local
 - Run AML service: ./mvnw -pl risk-aml-service spring-boot:run -Dspring-boot.run.profiles=local
+- Run both images instead (ADR 0022): docker compose -f infra/docker-compose.yml --profile apps up -d --build
+- Smoke test a running stack: scripts/smoke.sh
 
 ## Stack
 Java 25, Spring Boot 4.x, Spring Security 7 (OAuth2 resource server, Keycloak),

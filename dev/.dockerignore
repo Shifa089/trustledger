@@ -1,0 +1,31 @@
+# Build context for core-app/Dockerfile and risk-aml-service/Dockerfile is dev/ (they need the parent pom,
+# event-contracts and the Maven wrapper). Only what the build stage copies is needed; above all, secrets and
+# local state must never reach the context (an image layer or the build cache would keep them).
+
+# Secrets
+.env
+.env.*
+!.env.example
+http/http-client.private.env.json
+
+# Build output, made fresh inside the build stage
+**/target/
+
+# Tests are not compiled for the image (-Dmaven.test.skip=true)
+**/src/test/
+
+# Everything that isn't source code of the three Maven modules
+.git
+.idea/
+.vscode/
+*.iml
+.claude/
+docs/
+http/
+infra/
+load-tests/
+scripts/
+*.md
+!**/src/**/*.md
+**/Dockerfile
+.dockerignore

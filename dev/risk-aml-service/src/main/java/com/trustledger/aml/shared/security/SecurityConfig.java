@@ -56,8 +56,18 @@ public class SecurityConfig {
         if (audiences.isEmpty()) {
             throw new IllegalStateException("spring.security.oauth2.resourceserver.jwt.audiences is required");
         }
+        return jwtDecoder(issuer, properties.getJwt().getJwkSetUri(), audiences);
+    }
+
+    /**
+     * Same as core-app's: an optional {@code jwkSetUri} only changes where the keys are read from (M14 containers);
+     * {@code iss} must still equal {@code issuer}.
+     */
+    static JwtDecoder jwtDecoder(String issuer, String jwkSetUri, List<String> audiences) {
         return new SupplierJwtDecoder(() -> {
-            NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuer).build();
+            NimbusJwtDecoder decoder = jwkSetUri == null || jwkSetUri.isBlank()
+                    ? NimbusJwtDecoder.withIssuerLocation(issuer).build()
+                    : NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
             decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                     JwtValidators.createDefaultWithIssuer(issuer), audienceValidator(audiences)));
             return decoder;

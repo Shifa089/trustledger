@@ -140,6 +140,58 @@ services:
       retries: 10
       start_period: 30s
 
+  # Both apps from their images (profile "apps", M14): the containers that CI builds, run against this compose
+  # infrastructure. Same Spring "local" profile as spring-boot:run; only the host names change (container names
+  # instead of localhost). Stop any spring-boot:run first (same ports 8080/8081). Build and start:
+  #   docker compose -f infra/docker-compose.yml --profile apps up -d --build
+  #   scripts/smoke.sh
+  # Tokens are requested from http://localhost:8180, so their iss is that URL, which the app keeps checking; only
+  # the keys are fetched over the compose network (jwk-set-uri), since localhost inside a container is the container.
+  core-app:
+    image: trustledger/core-app:local
+    build:
+      context: ..
+      dockerfile: core-app/Dockerfile
+    profiles: ["apps"]
+    env_file: ../.env
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/$${POSTGRES_DB}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/trustledger/protocol/openid-connect/certs
+      TRUSTLEDGER_KYC_STORAGE_ENDPOINT: http://localstack:4566
+      TRUSTLEDGER_PRIVACY_STORAGE_ENDPOINT: http://localstack:4566
+      TRUSTLEDGER_SMTP_HOST: mailpit
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      localstack: { condition: service_healthy }
+      mailpit: { condition: service_healthy }
+    restart: unless-stopped
+
+  risk-aml-service:
+    image: trustledger/risk-aml-service:local
+    build:
+      context: ..
+      dockerfile: risk-aml-service/Dockerfile
+    profiles: ["apps"]
+    env_file: ../.env
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/$${POSTGRES_DB}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/trustledger/protocol/openid-connect/certs
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   redis-data:

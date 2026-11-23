@@ -73,8 +73,20 @@ public class SecurityConfig {
         if (audiences.isEmpty()) {
             throw new IllegalStateException("spring.security.oauth2.resourceserver.jwt.audiences is required");
         }
+        return jwtDecoder(issuer, properties.getJwt().getJwkSetUri(), audiences);
+    }
+
+    /**
+     * Without {@code jwkSetUri} the keys come from the issuer's OIDC discovery document. With it (M14: the apps in
+     * containers, where the issuer {@code http://localhost:8180/...} in the tokens is not reachable but
+     * {@code http://keycloak:8080/.../certs} is) they are fetched from there. Either way {@code iss} must equal
+     * {@code issuer}: only where the keys are read from changes, never which tokens are accepted.
+     */
+    static JwtDecoder jwtDecoder(String issuer, String jwkSetUri, List<String> audiences) {
         return new SupplierJwtDecoder(() -> {
-            NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuer).build();
+            NimbusJwtDecoder decoder = jwkSetUri == null || jwkSetUri.isBlank()
+                    ? NimbusJwtDecoder.withIssuerLocation(issuer).build()
+                    : NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
             decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                     JwtValidators.createDefaultWithIssuer(issuer), audienceValidator(audiences)));
             return decoder;
