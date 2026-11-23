@@ -144,6 +144,24 @@ Grafana reloads it within 30 s. Metrics arrive every 15 s, so a new panel value 
 and show only the status. Health components, `/actuator/metrics` and `/actuator/info` need an ADMIN token; everything
 else under `/actuator` is not exposed.
 
+### Run the container images and the smoke test
+
+Both apps have multi-stage Dockerfiles: a layered jar on a Temurin 25 JRE, a non-root user, and a HEALTHCHECK on
+`/actuator/health` ([ADR 0022](docs/adr/0022-container-images.md)). The compose profile `apps` builds and runs them
+against the same local infrastructure. Stop any `spring-boot:run` first, since they use the same ports:
+
+```bash
+docker compose -f infra/docker-compose.yml --profile apps up -d --build
+docker compose -f infra/docker-compose.yml ps            # core-app and risk-aml-service become "healthy"
+scripts/smoke.sh                                         # Git Bash; also works against spring-boot:run
+```
+
+[scripts/smoke.sh](scripts/smoke.sh) checks health (both apps and Keycloak), gets a token, calls `/me`, runs one
+₹1.00 transfer and its idempotent replay, and exits non-zero at the first failure. It needs two FULL-tier test users
+that aren't frozen. The defaults are customer1 → customer2; the header shows how to use the seeded `perf001` →
+`perf002` instead. CI builds both images on every push to `master`, after the tests and scans pass. Nothing is pushed
+to a registry yet.
+
 ### Try the money path
 
 IntelliJ HTTP Client files in [http/](http/) (environment `local`), in this order:
@@ -201,6 +219,7 @@ Kafka (M8) · OpenTelemetry + Grafana LGTM (M12) · Testcontainers · WireMock �
 | [0016](docs/adr/0016-mapping-without-mapstruct.md) | Mapping with static factories, not MapStruct |
 | [0020](docs/adr/0020-opentelemetry-otlp-observability.md) | OpenTelemetry over OTLP to Grafana LGTM |
 | [0021](docs/adr/0021-ci-dependency-and-secret-scanning.md) | Trivy and gitleaks in CI, pinned by digest |
+| [0022](docs/adr/0022-container-images.md) | Multi-stage Dockerfiles, layered jar, non-root, images built in CI |
 
 Security review: [docs/security-checklist.md](docs/security-checklist.md) maps the OWASP API Security Top 10 (2023)
 to our controls and the tests that prove them.

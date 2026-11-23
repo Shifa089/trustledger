@@ -139,3 +139,41 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/repo" "$GITLEAKS_IMAGE" \
             git /repo --config /repo/.gitleaks.toml --log-opts=--all --redact --no-banner --exit-code 1
+
+  # Container images (M14, ADR 0022): both Dockerfiles are built on pushes to the default branch only, and only after
+  # the tests and both scans passed (test -> scan -> build). Nothing is pushed to a registry or deployed yet; that is
+  # the AWS half of M14. The checks below keep the properties the Dockerfiles promise: non-root, a HEALTHCHECK on
+  # /actuator/health and a layered jar.
+  images:
+    name: Build container images
+    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs: [verify, dependency-scan, secret-scan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build both images
+        run: |
+          for app in core-app risk-aml-service; do
+            docker build -f "$app/Dockerfile" -t "trustledger/$app:$TAG" .
+          done
+
+      - name: Check the images
+        run: |
+          for app in core-app risk-aml-service; do
+            image="trustledger/$app:$TAG"
+            user=$(docker image inspect --format '{{.Config.User}}' "$image")
+            uid=$(docker run --rm --entrypoint id "$image" -u)
+            echo "$image: USER '$user', runs as uid $uid"
+            if [ -z "$user" ] || [ "$uid" = "0" ]; then echo "::error::$image runs as root"; exit 1; fi
+            docker image inspect --format '{{json .Config.Healthcheck}}' "$image" | grep -q '/actuator/health' \
+              || { echo "::error::$image has no HEALTHCHECK on /actuator/health"; exit 1; }
+            docker run --rm --entrypoint ls "$image" /app/application.jar /app/lib > /dev/null \
+              || { echo "::error::$image is not the extracted layered jar"; exit 1; }
+          done
+          docker image ls 'trustledger/*'
