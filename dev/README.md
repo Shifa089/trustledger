@@ -200,6 +200,10 @@ Kafka (M8) · OpenTelemetry + Grafana LGTM (M12) · Testcontainers · WireMock �
 | [0015](docs/adr/0015-archunit-architecture-rules.md) | ArchUnit for the rules inside a module |
 | [0016](docs/adr/0016-mapping-without-mapstruct.md) | Mapping with static factories, not MapStruct |
 | [0020](docs/adr/0020-opentelemetry-otlp-observability.md) | OpenTelemetry over OTLP to Grafana LGTM |
+| [0021](docs/adr/0021-ci-dependency-and-secret-scanning.md) | Trivy and gitleaks in CI, pinned by digest |
+
+Security review: [docs/security-checklist.md](docs/security-checklist.md) maps the OWASP API Security Top 10 (2023)
+to our controls and the tests that prove them.
 
 ## Local authentication (Keycloak)
 

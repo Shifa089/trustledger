@@ -1,0 +1,19 @@
+# gitleaks configuration (ADR 0021). CI runs `gitleaks git --log-opts=--all` over the whole history of every
+# branch with this file. Start from the default rules and allowlist only proven false positives, each as narrowly
+# as possible. A real secret is never allowlisted: rotate it, then remove it from history.
+
+title = "TrustLedger gitleaks config"
+
+[extend]
+useDefault = true
+
+# The IntelliJ request files send hand-written UUIDs as Idempotency-Key headers. An idempotency key is a
+# client-chosen request ID, not a credential, but "<something>-Key: <random-looking value>" matches the
+# generic-api-key rule. Allowed only for that header, only with a UUID value, only in dev/http/*.http.
+[[allowlists]]
+description = "Idempotency-Key UUIDs in IntelliJ HTTP request files"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^dev/http/[^/]+\.http$''']
+regexTarget = "line"
+regexes = ['''Idempotency-Key:\s*[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\s*$''']

@@ -1,0 +1,9 @@
+# Trivy exceptions (ADR 0021). Read by the dependency-scan job in .github/workflows/ci.yml.
+#
+# Empty on purpose. An entry is allowed only for a vulnerability that does not affect TrustLedger (the vulnerable
+# code path is never reached) and only with an expiry, on this format:
+#
+#   # <library>: why it does not apply, who decided, link to the analysis
+#   CVE-YYYY-NNNNN exp:YYYY-MM-DD
+#
+# Never add an entry just to make CI green: upgrade the library (or its BOM-managed version) instead.
