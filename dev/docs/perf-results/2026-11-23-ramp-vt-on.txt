@@ -1,0 +1,83 @@
+time="2026-11-23T15:51:09+05:30" level=info msg="setup: 200 tokens, valid 1800s; subject prefix 0e7f0001" source=console
+time="2026-11-23T15:55:47+05:30" level=warning msg="Insufficient VUs, reached 400 active VUs and cannot initialize more" executor=constant-arrival-rate scenario=rps100
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate>0.99' rate=100.00%
+
+    http_req_duration{name:transfer,scenario:rps10}
+    ✓ 'p(99)<300' p(99)=82.26ms
+
+    http_req_duration{name:transfer,scenario:rps100}
+    ✗ 'p(99)<300' p(99)=9.07s
+
+    http_req_duration{name:transfer,scenario:rps50}
+    ✗ 'p(99)<300' p(99)=396.66ms
+
+    http_req_duration{name:transfer}
+    ✗ 'p(99)<300' p(99)=8.54s
+
+    http_req_failed{name:transfer,scenario:rps10}
+    ✓ 'rate<0.01' rate=0.00%
+
+    http_req_failed{name:transfer,scenario:rps100}
+    ✓ 'rate<0.01' rate=0.00%
+
+    http_req_failed{name:transfer,scenario:rps50}
+    ✓ 'rate<0.01' rate=0.00%
+
+    http_req_failed{name:transfer}
+    ✓ 'rate<0.01' rate=0.00%
+
+    http_reqs{name:transfer,scenario:rps10}
+    ✓ 'count>0' count=1200
+
+    http_reqs{name:transfer,scenario:rps100}
+    ✓ 'count>0' count=8305
+
+    http_reqs{name:transfer,scenario:rps50}
+    ✓ 'count>0' count=6001
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 31012   79.933516/s
+    checks_succeeded...: 100.00% 31012 out of 31012
+    checks_failed......: 0.00%   0 out of 31012
+
+    ✓ status is 201
+    ✓ transfer COMPLETED
+
+    HTTP
+    http_req_duration.....................: avg=2.91s   min=24.27ms med=1.75s   p(90)=6.7s     p(95)=7.25s    p(99)=8.53s    max=12.28s  
+      { expected_response:true }..........: avg=2.91s   min=24.27ms med=1.75s   p(90)=6.7s     p(95)=7.25s    p(99)=8.53s    max=12.28s  
+      { name:transfer,scenario:rps10 }....: avg=41.89ms min=24.66ms med=39.67ms p(90)=53.33ms  p(95)=61.18ms  p(99)=82.26ms  max=288.78ms
+      { name:transfer,scenario:rps100 }...: avg=5.44s   min=34.62ms med=5.63s   p(90)=7.22s    p(95)=7.75s    p(99)=9.07s    max=12.28s  
+      { name:transfer,scenario:rps50 }....: avg=86.85ms min=24.27ms med=67.25ms p(90)=130.61ms p(95)=250.78ms p(99)=396.66ms max=646.38ms
+      { name:transfer }...................: avg=2.95s   min=24.27ms med=2.6s    p(90)=6.71s    p(95)=7.26s    p(99)=8.54s    max=12.28s  
+    http_req_failed.......................: 0.00% 0 out of 15708
+      { name:transfer,scenario:rps10 }....: 0.00% 0 out of 1200
+      { name:transfer,scenario:rps100 }...: 0.00% 0 out of 8305
+      { name:transfer,scenario:rps50 }....: 0.00% 0 out of 6001
+      { name:transfer }...................: 0.00% 0 out of 15506
+    http_reqs.............................: 15708 40.487413/s
+      { name:transfer,scenario:rps10 }....: 1200  3.093003/s
+      { name:transfer,scenario:rps100 }...: 8305  21.40616/s
+      { name:transfer,scenario:rps50 }....: 6001  15.467594/s
+
+    EXECUTION
+    dropped_iterations....................: 3696  9.52645/s
+    iteration_duration....................: avg=2.95s   min=24.27ms med=2.6s    p(90)=6.71s    p(95)=7.26s    p(99)=8.54s    max=12.28s  
+    iterations............................: 15506 39.966758/s
+    vus...................................: 109   min=0          max=400
+    vus_max...............................: 400   min=100        max=400
+
+    NETWORK
+    data_received.........................: 14 MB 36 kB/s
+    data_sent.............................: 22 MB 57 kB/s
+
+
+
+time="2026-11-23T15:57:34+05:30" level=error msg="thresholds on metrics 'http_req_duration{name:transfer,scenario:rps100}, http_req_duration{name:transfer,scenario:rps50}, http_req_duration{name:transfer}' have been crossed"
