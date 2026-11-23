@@ -6,7 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.trustledger.core.TestcontainersConfiguration;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,6 +29,14 @@ class KycMigrationIT {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    /** Raw rows this test wrote; removed after each test so they never show up in the officers' queues. */
+    private final List<UUID> inserted = new ArrayList<>();
+
+    @AfterEach
+    void removeRawCases() {
+        inserted.forEach(id -> jdbc.update("delete from kyc.kyc_cases where id = ?", id));
+    }
 
     @Test
     void sameOfficerAsMakerAndCheckerIsRejectedByTheDatabase() {
@@ -119,6 +130,7 @@ class KycMigrationIT {
                 values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
                 id, userId, level, status, min ? "ciphertext" : null, min ? PAN_HASH : null, verifiedBy, approvedBy,
                 reason, now, now);
+        inserted.add(id);
         return id;
     }
 }
