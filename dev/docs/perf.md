@@ -1,7 +1,9 @@
 # Performance notes
 
-Measured numbers only. Each section says how the numbers were produced so they can be reproduced. Load-test
-results (k6, throughput, p95/p99, virtual threads on/off) are added in M13.
+Measured numbers only. Each section says how the numbers were produced so they can be reproduced.
+
+- §1: transaction history query plans (M11).
+- §2: transfer API load test with k6, and virtual threads on vs off (M13).
 
 ## 1. Transaction history query (FR-S-1, M11, Day 22)
 
@@ -104,3 +106,98 @@ Execution Time: 0.069 ms
   wallet, but it isn't indexed. If it becomes common, add `(wallet, amount_minor, created_at, id)` indexes; until
   then the extra write cost on every transfer isn't worth it.
 - No query touches another wallet's rows: every plan's index condition starts with the caller's wallet ID.
+
+## 2. Transfer API under load (M13, Day 24 A)
+
+SPEC §2 target: **`POST /api/v1/transfers` p99 under 300 ms at 100 requests per second** on a laptop.
+
+**Result: not met.** p99 stays under 100 ms at 10 req/s. At 50 req/s it is 397 ms. At 100 req/s the app reaches its
+throughput ceiling: 56 to 80 completed transfers per second, with p99 of several seconds. No request failed, and no
+money drifted.
+
+### How it was measured
+
+- **Script:** `load-tests/transfers.js` (k6 v2.4.0). How to run it, and how the data and tokens are set up:
+  `load-tests/README.md`.
+- **Data:** 200 seeded FULL-tier wallets (Spring profile `perf`, `PerfSeeder`), each starting with ₹1,00,000.
+- **Requests:** a random sender and receiver, a random amount from ₹1.00 to ₹100.00, a new `Idempotency-Key` on every
+  request, and one real Keycloak RS256 token per user. The tokens are fetched once in `setup()` and verified by the app
+  on every request.
+- **Load:** `constant-arrival-rate`. k6 starts requests at the given rate whether earlier ones have finished or not, at
+  most 400 VUs. If the app is slower than the rate, the requests k6 could not start are counted as
+  `dropped_iterations`.
+- **App:** core-app with `local,perf` via `spring-boot:run`, on the same laptop as k6 and the Docker infrastructure
+  (PostgreSQL 17, Redis 8, Kafka 4.4 and Keycloak 26.8 in Docker Desktop 29.9). risk-aml-service was not running.
+  Defaults: virtual threads on, Hikari pool not configured (Hikari's default is 10 connections), log level INFO,
+  tracing sampling 1.0 (`local` profile; no OTLP export without `obs`).
+  - Per request, the money path runs: JWT validation, the Redis rate limiter (raised to 600 per minute by `perf`),
+    the JIT user lookup, the idempotency claim, then the transfer transaction (two `SELECT ... FOR UPDATE`, limit
+    sums, ledger posting, outbox row), then the idempotency response store.
+- **Laptop:** Intel Core i5-13420H (8 cores, 12 threads), 15.7 GB RAM, Windows 11 Home, Java 25.0.4.1.
+- **Raw k6 output** of every run below: `docs/perf-results/2026-11-23-*.txt`.
+- **When:** 2026-11-23, one run per configuration. The runs weren't repeated, so the run-to-run variance is unknown.
+
+### Results: ramp 10 → 50 → 100 req/s (2 minutes each, virtual threads on)
+
+| Stage | Transfers completed | Throughput | Dropped | p50 | p95 | p99 | max | Errors | p99 < 300 ms |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 10 req/s | 1,200 of 1,200 | 10 /s | 0 | 39.67 ms | 61.18 ms | **82.26 ms** | 288.78 ms | 0.00% | ✓ |
+| 50 req/s | 6,001 of 6,000 | 50 /s | 0 | 67.25 ms | 250.78 ms | **396.66 ms** | 646.38 ms | 0.00% | ✗ |
+| 100 req/s | 8,305 of 12,000 | ≈69 /s | 3,696 (whole run) | 5.63 s | 7.75 s | **9.07 s** | 12.28 s | 0.00% | ✗ |
+| All | 15,506 | | 3,696 | 2.6 s | 7.26 s | 8.54 s | 12.28 s | 0.00% | ✗ |
+
+- k6 reports throughput as count ÷ total test time (6.5 minutes). The "Throughput" column is count ÷ 120 s, the length
+  of the stage. Rows 1 and 2 show that the app kept up there.
+- k6 reports `dropped_iterations` for the whole run, 3,696. The "Insufficient VUs, reached 400" warning appeared only
+  in the 100 req/s stage, and 12,000 − 8,305 = 3,695, so the drops belong to that stage.
+- The count of 6,001 at 50 req/s is k6's own; it matches the rate within one request.
+- `checks`: 100% of 31,012 passed (`status is 201`, `transfer COMPLETED`).
+
+### Results: virtual threads on vs off at 100 req/s (2 minutes, `MODE=steady`)
+
+Each run started on a freshly started app: no 10 and 50 req/s warm-up as in the ramp. Virtual threads were switched
+off with `--spring.threads.virtual.enabled=false` (Tomcat's platform thread pool, 200 threads by default).
+
+| Virtual threads | Transfers completed | Throughput | Dropped | p50 | p95 | p99 | max | Errors |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **on** (default) | 7,263 of 12,000 | 55.6 /s | 4,739 | 6.15 s | 11.41 s | **14.81 s** | 23.34 s | 0.00% |
+| **off** | 10,210 of 12,000 | 79.9 /s | 1,791 | 4.51 s | 5.77 s | **6.49 s** | 8.15 s | 0.00% |
+
+Neither configuration meets the target at 100 req/s. In this single pair of runs, platform threads completed 41% more
+transfers (79.9 vs 55.6 per second), and their p99 was less than half as long (6.49 s vs 14.81 s).
+
+### Correctness after the load
+
+Checked in PostgreSQL after all runs. That is 33,348 transfers between the perf wallets: the three runs above plus a
+369-transfer smoke run of the script.
+
+| Check | Result |
+| --- | --- |
+| Sum of the 200 perf wallets' balances | ₹20,00,00,000.00 = 200 × ₹1,00,000 (money moved between wallets, none appeared or vanished) |
+| Held amounts | 0 (no transfer reached the ₹50,000 hold) |
+| Transfers by status | 33,348 COMPLETED, nothing else |
+| Wallets whose cached balance ≠ ledger-derived balance | **0** |
+| Journal entries whose debits ≠ credits | **0** |
+| Lowest / highest perf wallet balance | ₹97,287.39 / ₹1,03,917.70 |
+
+There were no deadlocks (they would be 500 errors; errors were 0%), and no request failed at any load. Above the
+ceiling the system queues: it gets slower but stays correct.
+
+### What the numbers say, and what isn't known yet
+
+- **Measured:**
+  - The ceiling on this laptop is about 55 to 80 transfers per second.
+  - Up to 10 req/s the p99 is far inside the target. At 50 req/s it is already above it.
+  - At 100 req/s, platform threads did better than virtual threads.
+- **Not measured yet: where the time goes.** A likely suspect is the Hikari pool of 10 connections, shared by
+  everything a transfer does in its own transactions: JIT lookup, idempotency claim, transfer, response store. It is
+  also shared by the outbox and notification listeners after each commit.
+  - With virtual threads, every one of up to 400 in-flight requests can be running and waiting for a connection at
+    once. With platform threads, Tomcat admits at most 200, and the rest wait in the accept queue.
+  - That would fit the virtual-threads result, but it is a hypothesis, not a measurement.
+- **Next (rest of M13):**
+  - Repeat with Hikari pool sizes 10 / 20 / 40, watching `hikaricp_connections_pending` (Grafana, `obs` profile).
+  - `EXPLAIN ANALYZE` on the transfer path's queries: limit sums, idempotency claim, wallet locks.
+  - Re-measure here with the same script.
+- **The load generator shares the laptop.** k6 (up to 400 VUs), the app and all containers share 12 hardware threads,
+  so these are numbers for one laptop running everything, not for the app alone.

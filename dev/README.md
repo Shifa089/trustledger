@@ -170,6 +170,13 @@ Money paths are tested for the happy path, each rejection rule, idempotent retry
   `PendingTopupReconcilerIT`);
 - every endpoint × role combination (`SecurityMatrixIT`).
 
+### Load test (M13)
+
+k6 drives `POST /transfers` between 200 seeded wallets (profile `perf`) with real Keycloak tokens. Setup and commands:
+[load-tests/README.md](load-tests/README.md). Measured results: [docs/perf.md](docs/perf.md) §2. On a laptop, p99 is
+82 ms at 10 req/s. The 300 ms target at 100 req/s is **not met yet**: the app tops out at about 55 to 80 transfers per
+second. No request failed and no money drifted.
+
 ## Tech stack
 
 Java 25 · Spring Boot 4 · Spring Security 7 (OAuth2 resource server, Keycloak) · Spring Data JPA · PostgreSQL ·

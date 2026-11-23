@@ -1,0 +1,13 @@
+# Load-test profile (M13). Use together with "local": -Dspring-boot.run.profiles=local,perf
+# See load-tests/README.md. Fake test data only; never activate outside a developer machine.
+trustledger:
+  perf:
+    # 200 FULL-tier wallets (perf001..perf200 in Keycloak), each starting with ₹1,00,000 posted to the ledger.
+    seed:
+      wallets: 200
+      opening-balance: "100000.00"
+  # The limiter stays ON (its Redis round trip is part of every transfer), but at 100 req/s over 200 random senders
+  # each user sends ~30 transfers a minute, above the production budget of 20. Raised so the test measures transfers,
+  # not 429s.
+  rate-limit:
+    money-per-minute: 600
