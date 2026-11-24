@@ -41,6 +41,7 @@ import org.springframework.web.context.WebApplicationContext;
 @Import(TestcontainersConfiguration.class)
 class AmlSecurityIT {
 
+    private static final String ALERTS = "/api/v1/aml/alerts";
     private static final String CASES = "/api/v1/aml/cases";
     private static final String UNKNOWN_CASE = CASES + "/" + UUID.randomUUID();
     private static final String NOTES = "{\"notes\":\"x\"}";
@@ -51,6 +52,7 @@ class AmlSecurityIT {
     }
 
     private static final List<Endpoint> ENDPOINTS = List.of(
+            new Endpoint(() -> get(ALERTS), 200),
             new Endpoint(() -> get(CASES), 200),
             new Endpoint(() -> get(UNKNOWN_CASE), 404),
             new Endpoint(() -> get(UNKNOWN_CASE + "/str-report"), 404),
@@ -103,8 +105,11 @@ class AmlSecurityIT {
 
     @Test
     void anUnlistedPathIsRefusedEvenForAnOfficer() throws Exception {
-        // GET /aml/alerts is in SPEC §5 but not built yet: no rule, so denied.
-        mvc.perform(get("/api/v1/aml/alerts").with(token("COMPLIANCE_OFFICER"))).andExpect(status().isForbidden());
+        // POST /aml/cases/{id}/ai-summary is in SPEC §5 but deferred (M15): no rule, so denied.
+        mvc.perform(post(UNKNOWN_CASE + "/ai-summary").with(token("COMPLIANCE_OFFICER")))
+                .andExpect(status().isForbidden());
+        // The alert list is read-only: POST has no rule.
+        mvc.perform(post(ALERTS).with(token("COMPLIANCE_OFFICER"))).andExpect(status().isForbidden());
         // A known path with the wrong method has no rule either.
         mvc.perform(post(CASES).with(token("COMPLIANCE_OFFICER"))).andExpect(status().isForbidden());
         mvc.perform(get(UNKNOWN_CASE + "/close").with(token("COMPLIANCE_OFFICER"))).andExpect(status().isForbidden());
@@ -154,6 +159,28 @@ class AmlSecurityIT {
                 .andExpect(jsonPath("$.availableTags[?(@.tag == 'rule')].values[*]",
                         Matchers.hasItems("R1", "R2", "R3", "R4")));
         mvc.perform(get("/actuator/env").with(token("ADMIN"))).andExpect(status().isNotFound());
+    }
+
+    // --- Swagger (ADR 0010): outside the local profile, any signed-in caller; never anonymous ----------------------
+
+    @Test
+    void swaggerNeedsATokenOutsideTheLocalProfile() throws Exception {
+        for (String path : new String[] {"/v3/api-docs", "/swagger-ui.html", "/swagger-ui/index.html"}) {
+            mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void theOpenApiDocumentListsEveryAmlEndpointAndTheBearerScheme() throws Exception {
+        mvc.perform(get("/v3/api-docs").with(token("CUSTOMER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title").value("TrustLedger Risk and AML API"))
+                .andExpect(jsonPath("$.paths", Matchers.hasKey("/api/v1/aml/alerts")))
+                .andExpect(jsonPath("$.paths", Matchers.hasKey("/api/v1/aml/cases")))
+                .andExpect(jsonPath("$.paths", Matchers.hasKey("/api/v1/aml/cases/{id}/str-report")))
+                .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
+                .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.bearerFormat").value("JWT"))
+                .andExpect(jsonPath("$.security[0].bearerAuth").isArray());
     }
 
     @Test

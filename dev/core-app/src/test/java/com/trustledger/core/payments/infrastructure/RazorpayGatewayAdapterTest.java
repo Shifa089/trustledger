@@ -34,6 +34,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -402,17 +403,31 @@ class RazorpayGatewayAdapterTest {
             assertThat(adapter.circuitState()).isEqualTo(CircuitBreaker.State.CLOSED);
         }
 
+        /** Must-pass #9 word for word: timeouts alone open the circuit, which then fails fast with a 503 code. */
         @Test
-        void timeoutsCountAsFailures() {
+        void timeoutsAloneOpenTheCircuitWhichThenFailsFastWith503() {
             adapter.close();
             adapter = adapter(1, SHORT_TIMEOUT);
             razorpay.stubFor(get("/v1/payments/" + PAYMENT_ID).willReturn(okJson(ORDER_JSON).withFixedDelay(1_000)));
 
             for (int i = 0; i < 10; i++) {
-                catchThrowableOfType(GatewayUnavailableException.class, () -> adapter.fetchPayment(PAYMENT_ID));
+                GatewayUnavailableException timeout = catchThrowableOfType(GatewayUnavailableException.class,
+                        () -> adapter.fetchPayment(PAYMENT_ID));
+                assertThat(timeout).hasCauseInstanceOf(TimeoutException.class);
             }
-
             assertThat(adapter.circuitState()).isEqualTo(CircuitBreaker.State.OPEN);
+            assertThat(requests()).isEqualTo(10);
+
+            long start = System.nanoTime();
+            GatewayUnavailableException e = catchThrowableOfType(GatewayUnavailableException.class,
+                    () -> adapter.fetchPayment(PAYMENT_ID));
+            Duration elapsed = Duration.ofNanos(System.nanoTime() - start);
+
+            assertThat(e).hasCauseInstanceOf(CallNotPermittedException.class);
+            assertThat(e.errorCode()).isEqualTo(ErrorCode.GATEWAY_UNAVAILABLE);
+            assertThat(e.errorCode().status().value()).isEqualTo(503);
+            assertThat(elapsed).as("fails fast, not after the time limit").isLessThan(SHORT_TIMEOUT);
+            assertThat(requests()).as("an open circuit does not call the gateway").isEqualTo(10);
         }
     }
 }

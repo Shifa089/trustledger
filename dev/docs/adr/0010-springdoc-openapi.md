@@ -38,3 +38,16 @@ Use **springdoc-openapi 3.2.0**, version managed once in the parent POM (`spring
 - The document is generated from code, so it cannot drift, but it is only as good as the
   annotations: public endpoints (the Razorpay webhook in M7) must opt out of `bearerAuth`.
 - One more runtime dependency (plus the swagger-ui webjar) to keep patched when Spring Boot is upgraded.
+
+## Update (2026-11-23, Day 26 B): the AML service too
+
+The SPEC §12 definition of done asks for Swagger UI on **both** services. `risk-aml-service` now uses the same
+dependency (no new library: the version is still managed in the parent POM) and the same setup:
+- `OpenApiConfig` with the `bearerAuth` scheme;
+- `trustledger.security.swagger-public`, `true` only in `application-local.yml`;
+- a separate `@Order(1)` Swagger chain without the strict API CSP;
+- outside `local`, `/v3/api-docs` and `/swagger-ui/**` need any signed-in caller (`AmlSecurityIT`,
+  `AmlSwaggerPublicLocalTest`).
+
+The UI is at http://localhost:8081/swagger-ui.html. The M13 idea of switching springdoc off in an `aws` profile is
+still open for both services. It belongs to the AWS half of M14, which is deferred.

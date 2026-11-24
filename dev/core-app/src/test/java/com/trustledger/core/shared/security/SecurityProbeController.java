@@ -3,7 +3,6 @@ package com.trustledger.core.shared.security;
 import java.util.Map;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,11 +22,6 @@ class SecurityProbeController {
 
     @GetMapping(path = "/admin/probe", version = "1")
     Map<String, String> admin() {
-        return OK;
-    }
-
-    @GetMapping(path = "/admin/ledger/accounts/{code}/balance", version = "1")
-    Map<String, String> ledgerBalance(@PathVariable String code) {
         return OK;
     }
 

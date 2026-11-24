@@ -137,7 +137,8 @@ quoted inside alert details and notes; the case ID stays whole as the report's o
 ### Consequences
 
 - One more table and a scheduled job in the AML service; a freeze takes up to about one relay interval to leave.
-- The case list and every endpoint have an explicit security rule; `/aml/alerts` (SPEC §5) is denied until built.
+- The case list and every endpoint have an explicit security rule; `/aml/alerts` (SPEC §5) was denied until it was
+  built (Day 26 B, see the update below).
 - A request stuck in the outbox (broker down) shows as `publishedAt: null` in the case detail; alerting on old
   pending rows belongs to M12.
 
@@ -181,3 +182,11 @@ Matches the code: own `aml` schema and Flyway, `processed_events` claim, 3 attem
 `GET /aml/alerts` and `POST /aml/cases/{id}/ai-summary` (optional M15) are **not built** and are refused by the
 deny-all rule (`AmlSecurityIT`). **Still open** from "M12": no alert on DLT traffic or on freeze requests stuck in
 the outbox.
+
+## Update (2026-11-23, Day 26 B)
+
+`GET /aml/alerts` is built: `AmlAlertController` → `AmlAlertService` → `AlertRepository.search`, with optional
+`ruleCode`, `severity` and `walletId` filters, newest first. The query is a Spring Data fragment (`AlertSearchImpl`,
+Criteria API) and not `JpaSpecificationExecutor`, which would add a `delete(Specification)` to an append-only table.
+It has its own security rule, and `AmlSecurityIT` and `AmlEndpointAuthorizationCoverageIT` have rows for it.
+`POST /aml/cases/{id}/ai-summary` stays deferred (M15). The DLT and stuck-outbox alerts are still open.

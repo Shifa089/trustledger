@@ -11,7 +11,7 @@ event-driven microservice, with all tests running against real infrastructure in
 
 ## 1. Demo
 
-- **Demo video (5 minutes):** _link coming: recorded in M16_.
+- **Demo video (5 minutes):** _link coming_. The script is ready: [docs/demo-script.md](docs/demo-script.md).
 - **Live URL:** none yet. The AWS deployment is not built ([Not yet built](#not-yet-built)).
 - **Try it locally in three commands:** [section 7](#7-run-locally-in-3-commands), then the request tour
   [http/demo.http](http/demo.http).
@@ -174,7 +174,8 @@ docker compose -f infra/docker-compose.yml up -d
 | --- | --- |
 | core-app API | http://localhost:8080/api/v1 |
 | risk-aml-service API | http://localhost:8081/api/v1 |
-| Swagger UI (local profile) | http://localhost:8080/swagger-ui.html |
+| Swagger UI, core (local profile) | http://localhost:8080/swagger-ui.html |
+| Swagger UI, AML (local profile) | http://localhost:8081/swagger-ui.html |
 | Test checkout (local profile) | http://localhost:8080/checkout.html |
 | Keycloak | http://localhost:8180 |
 | Mailpit | http://localhost:8025 |
@@ -212,12 +213,12 @@ database.
 | 1 | An unbalanced journal entry is rejected by the service and by the database | `LedgerPostingServiceIT`, `LedgerMigrationIT` |
 | 2 | UPDATE and DELETE on ledger and audit tables fail | `LedgerMigrationIT`, `AuditMigrationIT` |
 | 3 | Same `Idempotency-Key` returns the original response; same key, other body → 422 | `IdempotencyInterceptorIT`, `IdempotencyServiceIT` |
-| 4 | 100 concurrent transfers never overdraw; reconciliation finds no mismatch | `TransferConcurrencyIT` |
+| 4 | 100 concurrent transfers never overdraw; reconciliation finds no mismatch | `TransferConcurrencyIT` (runs the real `ReconciliationJob` at the end) |
 | 5 | Opposite concurrent transfers never deadlock | `DeadlockFreedomIT` |
-| 6 | Every transfer rejection rule returns the right error code | `TransferServiceIT` |
+| 6 | Every transfer rejection rule returns the right error code | `TransferServiceIT`, `TransferMonthlyLimitIT` |
 | 7 | A high-value transfer is held, then approved or rejected exactly once | `HeldTransferServiceIT` |
 | 8 | Duplicate and invalid-signature webhooks are handled safely | `RazorpayWebhookControllerIT`, `TopupWebhookSettlementIT` |
-| 9 | A gateway timeout opens the circuit breaker and returns 503 | `TopupControllerIT` |
+| 9 | A gateway timeout opens the circuit breaker and returns 503 | `RazorpayGatewayAdapterTest` (timeouts alone open it), `TopupControllerIT` |
 | 10 | KYC maker and checker must be different officers | `ComplianceKycIT`, `KycReviewServiceTest` |
 | 11 | 401/403/200 for every endpoint × role; no BOLA | `SecurityMatrixIT`, `AmlSecurityIT` |
 | 12 | Each AML rule fires at its threshold, not just below; HIGH freezes the wallet | `VelocityRuleTest`, `StructuringRuleTest`, `LargeAmountRuleTest`, `FanOutRuleTest`, `RuleEngineIT`, `AccountFreezeRequestedConsumerIT` |
@@ -279,9 +280,9 @@ Deliberately cut or postponed, in the order SPEC §12 says to cut them:
 - **Hibernate Envers** entity history (M10). The hash-chained audit trail covers who changed what; Envers would add
   full row versions.
 - **AI case summary** (optional M15, `POST /aml/cases/{id}/ai-summary`): refused by the deny-all rule.
-- Smaller gaps, each recorded in its ADR: `GET /aml/alerts` and `GET /admin/ledger/accounts/{code}/balance` (security
-  rules exist, no handler), `lock_timeout` on money transactions, alerts on DLT traffic, parked top-ups and stale
-  outbox rows, disabling the Keycloak account of an erased customer, the 300 ms p99 target at 100 transfers/s.
+- Smaller gaps, each recorded in its ADR: `lock_timeout` on money transactions, alerts on DLT traffic, parked top-ups
+  and stale outbox rows, disabling the Keycloak account of an erased customer, the 300 ms p99 target at 100
+  transfers/s.
 
 ---
 

@@ -7,6 +7,9 @@ import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OA
 import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -37,9 +40,13 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Configuration(proxyBeanMethods = false)
 @EnableMethodSecurity
+@EnableConfigurationProperties(AmlSecurityProperties.class)
 public class SecurityConfig {
 
     static final String API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+
+    /** springdoc's OpenAPI document and Swagger UI (ADR 0010). */
+    static final String[] SWAGGER_PATHS = {"/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**"};
 
     /**
      * Checks: RS256 signature against the issuer's JWKS, {@code exp}/{@code nbf}, {@code iss} equals the configured
@@ -105,13 +112,16 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/liveness",
                                 "/actuator/health/readiness").permitAll()
-                        // FR-AML-4 case workflow: one rule per endpoint, so a new endpoint is refused until it
-                        // gets its own (and a row in AmlSecurityIT).
+                        // FR-AML-2/4 alerts and case workflow: one rule per endpoint, so a new endpoint is refused
+                        // until it gets its own (and a row in AmlSecurityIT).
+                        .requestMatchers(HttpMethod.GET, "/api/*/aml/alerts").hasRole(Role.COMPLIANCE_OFFICER.name())
                         .requestMatchers(HttpMethod.GET, "/api/*/aml/cases", "/api/*/aml/cases/*",
                                 "/api/*/aml/cases/*/str-report").hasRole(Role.COMPLIANCE_OFFICER.name())
                         .requestMatchers(HttpMethod.POST, "/api/*/aml/cases/*/assign", "/api/*/aml/cases/*/close",
                                 "/api/*/aml/cases/*/escalate").hasRole(Role.COMPLIANCE_OFFICER.name())
                         .requestMatchers("/actuator/**").hasRole(Role.ADMIN.name())
+                        // Reached only when the local-only swagger chain does not exist: any signed-in caller.
+                        .requestMatchers(SWAGGER_PATHS).authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(rs -> rs
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter))
@@ -127,6 +137,27 @@ public class SecurityConfig {
                         .httpStrictTransportSecurity(hsts -> hsts
                                 .includeSubDomains(true)
                                 .maxAgeInSeconds(Duration.ofDays(365).toSeconds())));
+        return http.build();
+    }
+
+    /**
+     * Local profile only ({@code trustledger.security.swagger-public=true}): Swagger UI without a token, as in
+     * core-app. A separate chain because the UI needs scripts and styles that the strict API CSP forbids.
+     */
+    @Bean
+    @Order(1)
+    @ConditionalOnProperty(name = "trustledger.security.swagger-public", havingValue = "true")
+    SecurityFilterChain swaggerSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher(SWAGGER_PATHS)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .requestCache(cache -> cache.disable())
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .headers(headers -> headers.frameOptions(frame -> frame.deny()));
         return http.build();
     }
 }

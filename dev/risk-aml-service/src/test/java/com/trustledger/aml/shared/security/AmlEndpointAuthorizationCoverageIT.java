@@ -69,6 +69,7 @@ class AmlEndpointAuthorizationCoverageIT {
 
     /** Who may call each endpoint (SPEC §5). Path variables other than the version keep their names. */
     private static final Map<String, Set<Caller>> EXPECTED = Map.ofEntries(
+            Map.entry("GET /api/v1/aml/alerts", OFFICER),
             Map.entry("GET /api/v1/aml/cases", OFFICER),
             Map.entry("GET /api/v1/aml/cases/{id}", OFFICER),
             Map.entry("GET /api/v1/aml/cases/{id}/str-report", OFFICER),

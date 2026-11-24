@@ -65,9 +65,27 @@ Authorization: Bearer {{officer1_token}}
 GET {{aml}}/api/v1/aml/cases/{{fp_case_id}}
 Authorization: Bearer {{customer1_token}}
 
-### NOT BUILT YET (SPEC §5): alert search by rule, severity and wallet -> 403 today (no security rule, so denied)
-GET {{aml}}/api/v1/aml/alerts?rule=R2&severity=HIGH
+### officer1: every alert, newest first (FR-AML-2) -> 200 {content:[{id, caseId, walletId, ruleCode, severity, details, createdAt}], page, size, ...}
+GET {{aml}}/api/v1/aml/alerts?page=0&size=20
 Authorization: Bearer {{officer1_token}}
+
+> {% if (response.body.content.length > 0) client.global.set("alert_wallet_id", response.body.content[0].walletId); %}
+
+### officer1: alerts by rule and severity (ruleCode R1-R4; severity MEDIUM or HIGH) -> 200
+GET {{aml}}/api/v1/aml/alerts?ruleCode=R2&severity=HIGH
+Authorization: Bearer {{officer1_token}}
+
+### officer1: one wallet's alerts (from the first request) -> 200
+GET {{aml}}/api/v1/aml/alerts?walletId={{alert_wallet_id}}
+Authorization: Bearer {{officer1_token}}
+
+### officer1: malformed rule code -> 400 VALIDATION_FAILED ("R9" is well formed and just matches nothing)
+GET {{aml}}/api/v1/aml/alerts?ruleCode=X1
+Authorization: Bearer {{officer1_token}}
+
+### customer1: alerts are for compliance officers only -> 403 ACCESS_DENIED
+GET {{aml}}/api/v1/aml/alerts
+Authorization: Bearer {{customer1_token}}
 
 ### NOT BUILT YET (SPEC §5, optional M15): AI-drafted case summary -> 403 today (no security rule, so denied)
 POST {{aml}}/api/v1/aml/cases/{{fp_case_id}}/ai-summary

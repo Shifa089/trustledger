@@ -11,6 +11,8 @@ import com.trustledger.core.shared.ErrorCode;
 import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
 import com.trustledger.core.wallet.WalletTier;
+import com.trustledger.core.wallet.application.ReconciliationJob;
+import com.trustledger.core.wallet.application.ReconciliationReport;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -36,6 +38,9 @@ class TransferConcurrencyIT {
 
     @Autowired
     PaymentsFixtures fixtures;
+
+    @Autowired
+    ReconciliationJob reconciliation;
 
     private enum Outcome { COMPLETED, INSUFFICIENT_FUNDS }
 
@@ -74,5 +79,15 @@ class TransferConcurrencyIT {
         // The ledger reconciles: the journal-derived balances equal the cached ones.
         assertThat(fixtures.ledgerBalance(sender.walletId())).isZero();
         assertThat(fixtures.ledgerBalance(receiver.walletId())).isEqualTo(500_000);
+
+        // Must-pass 4 word for word: the real reconciliation job reports no mismatch for either wallet. The test
+        // database is shared, so (as in ReconciliationIT) we look at our own wallets in the complete listed part,
+        // never at the global totals, which include other tests' deliberately broken wallets.
+        ReconciliationReport report = reconciliation.runNow();
+        assertThat(report.truncated()).as("our wallets must be in the listed part").isFalse();
+        assertThat(report.walletsChecked()).isGreaterThanOrEqualTo(2);
+        assertThat(report.listed())
+                .filteredOn(m -> m.walletId().equals(sender.walletId()) || m.walletId().equals(receiver.walletId()))
+                .as("reconciliation mismatches for the sender and receiver").isEmpty();
     }
 }
