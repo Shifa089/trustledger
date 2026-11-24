@@ -140,6 +140,57 @@ jobs:
           docker run --rm -v "$PWD:/repo" "$GITLEAKS_IMAGE" \
             git /repo --config /repo/.gitleaks.toml --log-opts=--all --redact --no-banner --exit-code 1
 
+  # Web app (Day 29 F1, ADR 0023): lint, type-check, unit tests (Vitest + MSW), production build, then Playwright
+  # against the built app. Needs no backend: the browser tests that log in for real are tagged @stack and run only
+  # locally (npm run e2e:stack).
+  frontend:
+    name: Frontend (lint, type-check, test, build, e2e)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: dev/frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node with npm cache
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: dev/frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: dev/frontend/package-lock.json
+
+      - name: Install dependencies (lockfile only)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: npm run e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: dev/frontend/playwright-report/
+          retention-days: 7
+
   # Container images (M14, ADR 0022): both Dockerfiles are built on pushes to the default branch only, and only after
   # the tests and both scans passed (test -> scan -> build). Nothing is pushed to a registry or deployed yet; that is
   # the AWS half of M14. The checks below keep the properties the Dockerfiles promise: non-root, a HEALTHCHECK on

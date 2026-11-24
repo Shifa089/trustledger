@@ -124,7 +124,8 @@ else.
 | Storage, mail | AWS SDK v2 S3 (LocalStack locally), Spring Mail (Mailpit locally) |
 | Observability | OpenTelemetry over OTLP, Grafana LGTM (Tempo, Loki, Prometheus) |
 | Tests | JUnit 5, AssertJ, Mockito, Testcontainers, WireMock, ArchUnit, JaCoCo, k6 |
-| Delivery | Multi-stage Dockerfiles, GitHub Actions (verify, Trivy, gitleaks, image build) |
+| Web app | React 19, TypeScript (strict), Vite, React Router, TanStack Query, Tailwind + shadcn/ui, react-oidc-context (PKCE); Vitest, MSW, Playwright |
+| Delivery | Multi-stage Dockerfiles, GitHub Actions (verify, Trivy, gitleaks, frontend, image build) |
 
 ## 6. Repository map
 
@@ -132,6 +133,7 @@ else.
 | --- | --- |
 | [core-app/](core-app/) | The modular monolith |
 | [risk-aml-service/](risk-aml-service/) | The AML service |
+| [frontend/](frontend/) | The web app (React + TypeScript, Day 29+) |
 | [event-contracts/](event-contracts/) | Kafka contracts (`…V1` records) |
 | [infra/](infra/) | Docker Compose, the Keycloak realm, the Grafana dashboard |
 | [http/](http/) | Request collection for **every** endpoint ([index](http/README.md)) |
@@ -185,6 +187,21 @@ docker compose -f infra/docker-compose.yml up -d
 (CUSTOMER), officer1, officer2 (COMPLIANCE_OFFICER, **TOTP required**), admin1 (ADMIN, **TOTP required**), auditor1
 (AUDITOR). `scripts/aml-demo-webhooks.sh totp` prints the current staff code. Details in
 [Local authentication](#local-authentication-keycloak).
+
+### Web app
+
+With the stack above running (core-app with `local,demo`, the AML service with `local`):
+
+```bash
+cd frontend
+npm ci
+npm run dev          # http://localhost:5173; local defaults in src/config.ts
+```
+
+Sign in as any test user: each role gets its own navigation. Tokens stay in memory (never localStorage), so a page
+reload goes back through Keycloak, which signs you straight back in. Frontend tests: `npm run ci` (lint, type-check,
+Vitest, build), `npm run e2e` (Playwright, no backend needed) and `npm run e2e:stack` (a real login; export
+`TRUSTLEDGER_DEV_USER_PASSWORD` first). Rules in [ADR 0023](docs/adr/0023-frontend-stack.md).
 
 ## 8. Tests
 
@@ -266,6 +283,7 @@ request in [http/](http/)), `DemoSeederIT` (the demo seed is ledger-backed and i
 | [0020](docs/adr/0020-opentelemetry-otlp-observability.md) | OpenTelemetry over OTLP to Grafana LGTM |
 | [0021](docs/adr/0021-ci-dependency-and-secret-scanning.md) | Trivy and gitleaks in CI, pinned by image digest |
 | [0022](docs/adr/0022-container-images.md) | Multi-stage Dockerfiles, layered jar, non-root, images built in CI |
+| [0023](docs/adr/0023-frontend-stack.md) | React web app: OIDC Authorization Code + PKCE, tokens in memory, one API client |
 
 ADRs 0001–0009 were checked against the code on 2026-11-23. Each ends with a "Code check" note that names what
 still differs.

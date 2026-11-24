@@ -15,12 +15,14 @@ Full spec: docs/SPEC.md. Read the relevant section before every task.
 - Run AML service: ./mvnw -pl risk-aml-service spring-boot:run -Dspring-boot.run.profiles=local
 - Run both images instead (ADR 0022): docker compose -f infra/docker-compose.yml --profile apps up -d --build
 - Smoke test a running stack: scripts/smoke.sh
+- Web app: cd frontend && npm ci && npm run dev (see Frontend)
 
 ## Stack
 Java 25, Spring Boot 4.x, Spring Security 7 (OAuth2 resource server, Keycloak),
 Spring Data JPA + PostgreSQL + Flyway, Spring Modulith, Kafka, Redis, Resilience4j,
 Bucket4j, Lombok (entities only), springdoc-openapi (ADR 0010), AWS SDK v2 S3 (ADR 0011), ShedLock (ADR 0013), Spring Mail (ADR 0017), AspectJ via spring-boot-starter-aspectj (ADR 0018), Spring Cache on Redis via spring-boot-starter-cache (ADR 0019; never balances), OpenTelemetry over OTLP via spring-boot-starter-opentelemetry + opentelemetry-logback-appender (ADR 0020), Testcontainers, WireMock (ADR 0014), ArchUnit (ADR 0015),
 JUnit, Mockito, AssertJ. CI only: Trivy and gitleaks from digest-pinned images, no third-party actions (ADR 0021).
+Web app: see Frontend below (ADR 0023).
 
 ## Architecture rules (never break)
 - Modules: shared, identity, kyc, wallet, ledger, payments, audit, privacy,
@@ -55,6 +57,23 @@ JUnit, Mockito, AssertJ. CI only: Trivy and gitleaks from digest-pinned images, 
 - Only Razorpay TEST keys. Only fake test users and data.
 - Every endpoint has an explicit role rule; ownership checks prevent BOLA. The security chain ends in
   denyAll(): a new endpoint without its own rule is refused (add the rule and a SecurityMatrixIT row).
+
+## Frontend (frontend/, ADR 0023)
+React 19 + TypeScript (strict) + Vite, React Router, TanStack Query, Tailwind + shadcn/ui,
+react-oidc-context (oidc-client-ts); from Day 30: React Hook Form + Zod, Recharts.
+Vitest + React Testing Library + MSW, Playwright, ESLint. Node version in frontend/.nvmrc.
+- Commands (in frontend/): npm ci | npm run dev (5173, needs the local stack) | npm run lint |
+  npm run typecheck | npm test | npm run build | npm run e2e (built app, no backend) |
+  npm run e2e:stack (real Keycloak login; needs TRUSTLEDGER_DEV_USER_PASSWORD) | npm run ci
+- All API calls go through the API client (src/api): it adds the bearer token, X-Correlation-Id and
+  Idempotency-Key, and maps ProblemDetail errorCode to friendly messages. Never call fetch directly
+  (ESLint enforces it). A new backend errorCode needs a message in src/api/errors.ts (a test checks it).
+- No money arithmetic with floating point: amounts are decimal strings from the API, bigint paise in
+  the browser (src/lib/money.ts). No Number()/parseFloat on money.
+- Tokens never in localStorage or sessionStorage: oidc-client-ts userStore is in memory only.
+- UI role checks (RequireRole, navigation) are convenience; the backend enforces every role and
+  ownership rule. A new screen needs its route under the right RequireRole and a nav entry.
+- Only fake data; the TEST MODE banner stays on every page. VITE_* values are public: never secrets.
 
 ## Workflow
 - Plan first, wait for approval, then implement. Stay inside the current milestone.

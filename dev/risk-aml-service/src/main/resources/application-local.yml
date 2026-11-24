@@ -24,6 +24,11 @@ logging:
 trustledger:
   # Swagger UI at http://localhost:8081/swagger-ui.html without a token (local only, as in core-app).
   security:
+    # Vite dev server (5173) and vite preview (4173) of frontend/ (Keycloak client trustledger-web).
+    cors:
+      allowed-origins:
+        - http://localhost:5173
+        - http://localhost:4173
     swagger-public: true
   aml:
     kafka:

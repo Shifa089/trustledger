@@ -29,10 +29,11 @@ logging:
     correlation: "[%X{correlationId:-}] [%X{traceId:-},%X{spanId:-}] "
 trustledger:
   security:
-    # Vite dev server of the future web app (Keycloak client trustledger-web).
+    # Vite dev server (5173) and vite preview (4173) of frontend/ (Keycloak client trustledger-web).
     cors:
       allowed-origins:
         - http://localhost:5173
+        - http://localhost:4173
     swagger-public: true
   # LocalStack from infra/docker-compose.yml. "test"/"test" are LocalStack's dummy credentials, not secrets.
   kyc:

@@ -8,6 +8,10 @@ spring:
         jwt:
           issuer-uri: http://issuer.invalid/realms/trustledger
 trustledger:
+  security:
+    cors:
+      allowed-origins:
+        - http://localhost:5173
   aml:
     kafka:
       # Same 3 attempts, short waits so retry tests stay fast.
