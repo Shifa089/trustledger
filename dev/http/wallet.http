@@ -9,6 +9,12 @@ Authorization: Bearer {{customer1_token}}
 
 > {% client.global.set("wallet_id", response.body.walletId); %}
 
+### customer1: limits used (SPEC §5, Day 30) -> 200 {transferredToday, transferredThisMonth, addedThisMonth}
+# Decimal strings, counted like the limit checks: transfers COMPLETED or HELD_FOR_REVIEW, top-ups CREATED, PENDING or
+# CAPTURED; day and month start in Asia/Kolkata. A new wallet -> all "0.00". Before minimum KYC -> 403 KYC_REQUIRED.
+GET {{api}}/api/v1/wallets/me/limit-usage
+Authorization: Bearer {{customer1_token}}
+
 ### officer1: freeze customer1's wallet -> 200 {status FROZEN, currentFreeze {source COMPLIANCE, reason}}
 # Second run -> 409 INVALID_STATE_TRANSITION. Without a reason -> 400.
 POST {{api}}/api/v1/compliance/wallets/{{wallet_id}}/freeze

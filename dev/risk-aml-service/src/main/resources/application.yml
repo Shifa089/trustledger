@@ -104,7 +104,10 @@ logging:
 
 trustledger:
   # Swagger UI and /v3/api-docs without a token (ADR 0010): only the local profile turns it on.
+  # CORS allowlist for /api/** (exact origins, no wildcards). Empty = no cross-origin browser access.
   security:
+    cors:
+      allowed-origins: []
     swagger-public: false
   aml:
     kafka:

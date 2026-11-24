@@ -198,4 +198,27 @@ class LimitCheckerTest {
         refused(() -> at("2026-11-19T10:00:00Z").checkReceiverCap(receiverWithBalance("9000.00"), MIN,
                 Money.parse("1000.01")), ErrorCode.LIMIT_EXCEEDED);
     }
+
+    // --- usage for display (GET /wallets/me/limit-usage) ---
+
+    @Test
+    void usageSumsTheSameWindowsAndStatusesAsTheCheck() {
+        // 19 Nov 15:30 IST: the day started 18 Nov 18:30Z, the month 31 Oct 18:30Z.
+        when(transfers.sumOutgoingSince(SENDER, Instant.parse("2026-11-18T18:30:00Z"), LimitChecker.COUNTED))
+                .thenReturn(25_000L);
+        when(transfers.sumOutgoingSince(SENDER, Instant.parse("2026-10-31T18:30:00Z"), LimitChecker.COUNTED))
+                .thenReturn(400_000L);
+
+        LimitChecker.TransferUsage usage = at("2026-11-19T10:00:00Z").usage(SENDER);
+
+        assertThat(usage.todayMinor()).isEqualTo(25_000L);
+        assertThat(usage.thisMonthMinor()).isEqualTo(400_000L);
+        assertThat(LimitChecker.COUNTED)
+                .containsExactlyInAnyOrder(TransferStatus.COMPLETED, TransferStatus.HELD_FOR_REVIEW);
+    }
+
+    @Test
+    void usageNeedsAWallet() {
+        assertThatThrownBy(() -> at("2026-11-19T10:00:00Z").usage(null)).isInstanceOf(NullPointerException.class);
+    }
 }

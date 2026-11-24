@@ -40,4 +40,11 @@ public interface PaymentsApi {
      * rows inserted meanwhile never shift the slices.
      */
     TransactionSlice transactionsAfter(TransactionFilter filter, TransactionCursor after, int size);
+
+    /**
+     * SPEC §5 "limits used": what the wallet has used of its transfer and top-up limits at the clock's now, counted
+     * by the same rules as the limit checks (zero for an unknown wallet). A read without locks: a snapshot for
+     * display, never a basis for allowing a payment.
+     */
+    LimitUsage limitUsage(UUID walletId);
 }

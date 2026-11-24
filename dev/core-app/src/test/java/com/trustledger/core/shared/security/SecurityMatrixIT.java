@@ -194,6 +194,12 @@ class SecurityMatrixIT {
             "GET, /api/v1/wallets/me/transactions,        COMPLIANCE_OFFICER, 403",
             "GET, /api/v1/wallets/me/transactions,        ADMIN,              403",
             "GET, /api/v1/wallets/me/transactions,        AUDITOR,            403",
+            // Limit usage (Day 30): CUSTOMER only; an unprovisioned customer has no wallet (403 KYC_REQUIRED).
+            "GET, /api/v1/wallets/me/limit-usage,         NONE,               401",
+            "GET, /api/v1/wallets/me/limit-usage,         NO_ROLES,           403",
+            "GET, /api/v1/wallets/me/limit-usage,         COMPLIANCE_OFFICER, 403",
+            "GET, /api/v1/wallets/me/limit-usage,         ADMIN,              403",
+            "GET, /api/v1/wallets/me/limit-usage,         AUDITOR,            403",
             "POST, /api/v1/compliance/wallets/00000000-0000-7000-8000-000000000001/freeze, NONE,     401",
             "POST, /api/v1/compliance/wallets/00000000-0000-7000-8000-000000000001/freeze, CUSTOMER, 403",
             "POST, /api/v1/compliance/wallets/00000000-0000-7000-8000-000000000001/freeze, COMPLIANCE_OFFICER, 400",

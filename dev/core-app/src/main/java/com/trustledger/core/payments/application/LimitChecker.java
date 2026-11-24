@@ -79,6 +79,20 @@ public class LimitChecker {
         }
     }
 
+    /**
+     * Outgoing transfers that count against the daily and monthly limits right now, in minor units: the sums
+     * {@link #checkSender} compares with the limits. For display; no lock needed.
+     */
+    TransferUsage usage(UUID senderWalletId) {
+        Objects.requireNonNull(senderWalletId, "senderWalletId");
+        Windows windows = windowsAt(clock.instant());
+        return new TransferUsage(transfers.sumOutgoingSince(senderWalletId, windows.dayStart(), COUNTED),
+                transfers.sumOutgoingSince(senderWalletId, windows.monthStart(), COUNTED));
+    }
+
+    record TransferUsage(long todayMinor, long thisMonthMinor) {
+    }
+
     /** Start of the limit day and month that contain {@code now}, in the limit zone. */
     Windows windowsAt(Instant now) {
         LocalDate today = now.atZone(zone).toLocalDate();

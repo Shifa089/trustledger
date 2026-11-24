@@ -25,6 +25,7 @@ http/
 infra/
 load-tests/
 scripts/
+frontend/
 *.md
 !**/src/**/*.md
 **/Dockerfile

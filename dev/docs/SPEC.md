@@ -300,7 +300,8 @@ All endpoints sit under `/api/v1` (path versioning configured with Spring Framew
 | POST | `/compliance/kyc-cases/{id}/approve` | COMPLIANCE\_OFFICER | Checker step; must differ from the maker |
 | POST | `/compliance/kyc-cases/{id}/reject` | COMPLIANCE\_OFFICER | Reason required |
 | GET | `/compliance/kyc-cases/{id}/documents/{docId}` | COMPLIANCE\_OFFICER | S3 presigned URL valid 5 minutes (`{url, expiresAt}`); access is logged, audited from M10 |
-| GET | `/wallets/me` | CUSTOMER | Balance, held, available, tier, limits used |
+| GET | `/wallets/me` | CUSTOMER | Balance, held, available, tier, limits |
+| GET | `/wallets/me/limit-usage` | CUSTOMER | Limits used: transferred today and this month, added this month (counted like the limit checks) |
 | GET | `/wallets/me/transactions` | CUSTOMER | `from`, `to`, `type`, `page`, `size`, `sort` |
 | GET | `/wallets/me/statements/{yyyy-MM}` | CUSTOMER | PDF |
 | POST | `/compliance/wallets/{id}/freeze`, `/unfreeze` | COMPLIANCE\_OFFICER | Reason required |

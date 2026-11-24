@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * {@code GET /wallets/me}: amounts as decimal strings (SPEC §6). "Limits used" (spent today, added this month)
- * needs transfers and top-ups and arrives with M6/M7.
+ * needs transfers and top-ups, which this module can't read: it is {@code GET /wallets/me/limit-usage} (reporting).
  */
 public record MyWalletView(UUID walletId, WalletTier tier, WalletStatus status, String currency, String balance,
         String held, String available, Limits limits) {

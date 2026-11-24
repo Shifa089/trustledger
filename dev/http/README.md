@@ -45,6 +45,7 @@ they give today.
 | POST | `/compliance/kyc-cases/{id}/verify`, `/approve`, `/reject` | COMPLIANCE_OFFICER | kyc.http |
 | GET | `/compliance/kyc-cases/{id}/documents/{docId}` | COMPLIANCE_OFFICER | kyc.http |
 | GET | `/wallets/me` | CUSTOMER | wallet.http, demo.http |
+| GET | `/wallets/me/limit-usage` | CUSTOMER | wallet.http |
 | GET | `/wallets/me/transactions` | CUSTOMER | history.http, demo.http |
 | GET | `/wallets/me/statements/{yyyy-MM}` | CUSTOMER | history.http (**not built**: 404) |
 | POST | `/compliance/wallets/{id}/freeze`, `/unfreeze` | COMPLIANCE_OFFICER | wallet.http |

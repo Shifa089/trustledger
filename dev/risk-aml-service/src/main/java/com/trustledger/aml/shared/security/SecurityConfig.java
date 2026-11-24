@@ -27,6 +27,9 @@ import org.springframework.security.oauth2.jwt.SupplierJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -36,7 +39,8 @@ import tools.jackson.databind.json.JsonMapper;
  * The AML API (SPEC §5) is for compliance officers only, with one explicit rule per endpoint. Health is public for
  * probes; the rest of actuator needs ADMIN; anything not listed is denied, so a new endpoint needs its own rule here.
  * <p>
- * No CORS: this service has no browser client.
+ * CORS only for {@code /api/**} and only for the origins in {@code trustledger.security.cors.allowed-origins} (the web
+ * app, Day 29 F1); empty by default.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableMethodSecurity
@@ -108,6 +112,7 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .requestCache(cache -> cache.disable())
+                .cors(cors -> { }) // uses the CorsConfigurationSource bean below
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/liveness",
@@ -138,6 +143,21 @@ public class SecurityConfig {
                                 .includeSubDomains(true)
                                 .maxAgeInSeconds(Duration.ofDays(365).toSeconds())));
         return http.build();
+    }
+
+    /** Only {@code /api/**}; origins from {@code trustledger.security.cors.allowed-origins}. Same as core-app's. */
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(AmlSecurityProperties properties) {
+        CorsConfiguration cors = new CorsConfiguration();
+        cors.setAllowedOrigins(properties.cors().allowedOrigins());
+        cors.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+        cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Correlation-Id"));
+        cors.setExposedHeaders(List.of("X-Correlation-Id", "Content-Disposition"));
+        cors.setAllowCredentials(false); // bearer tokens, no cookies
+        cors.setMaxAge(Duration.ofHours(1));
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", cors);
+        return source;
     }
 
     /**

@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" role="img" aria-labelledby="t d">
+  <title id="t">TrustLedger architecture</title>
+  <desc id="d">Browser app signs in with Keycloak (OIDC, PKCE) and calls core-app and risk-aml-service with a bearer token. core-app writes events to an outbox and publishes them to Kafka; risk-aml-service consumes them and publishes freeze requests back. Each service has its own PostgreSQL schema. core-app also uses Redis, S3 for KYC documents, and Razorpay in test mode.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#475569"/>
+    </marker>
+    <style>
+      .box{fill:#f8fafc;stroke:#334155;stroke-width:1.5}
+      .app{fill:#eef2ff;stroke:#3730a3;stroke-width:1.5}
+      .infra{fill:#f1f5f9;stroke:#64748b;stroke-width:1.2}
+      .ext{fill:#fffbeb;stroke:#b45309;stroke-width:1.2;stroke-dasharray:5 3}
+      .h{font-weight:600;fill:#0f172a}
+      .s{font-size:12px;fill:#475569}
+      .l{stroke:#475569;stroke-width:1.5;fill:none;marker-end:url(#a)}
+      .lbl{font-size:11px;fill:#334155}
+    </style>
+  </defs>
+
+  <!-- Browser -->
+  <rect class="box" x="30" y="190" width="170" height="90" rx="10"/>
+  <text class="h" x="115" y="225" text-anchor="middle">Web app</text>
+  <text class="s" x="115" y="245" text-anchor="middle">React + TypeScript</text>
+  <text class="s" x="115" y="262" text-anchor="middle">tokens in memory</text>
+
+  <!-- Keycloak -->
+  <rect class="infra" x="30" y="40" width="170" height="70" rx="10"/>
+  <text class="h" x="115" y="70" text-anchor="middle">Keycloak</text>
+  <text class="s" x="115" y="90" text-anchor="middle">OIDC, roles, MFA</text>
+  <path class="l" d="M115 190V112"/>
+  <text class="lbl" x="122" y="155">Auth Code + PKCE</text>
+
+  <!-- core-app -->
+  <rect class="app" x="300" y="120" width="260" height="230" rx="12"/>
+  <text class="h" x="430" y="148" text-anchor="middle">core-app (modular monolith)</text>
+  <text class="s" x="430" y="172" text-anchor="middle">identity · kyc · wallet · ledger</text>
+  <text class="s" x="430" y="192" text-anchor="middle">payments · audit · privacy</text>
+  <text class="s" x="430" y="212" text-anchor="middle">notification · reporting</text>
+  <rect class="box" x="335" y="240" width="190" height="40" rx="8"/>
+  <text class="s" x="430" y="265" text-anchor="middle">double-entry ledger, outbox</text>
+  <text class="s" x="430" y="330" text-anchor="middle">Spring Boot 4 · Spring Modulith</text>
+
+  <!-- AML service -->
+  <rect class="app" x="680" y="120" width="250" height="120" rx="12"/>
+  <text class="h" x="805" y="150" text-anchor="middle">risk-aml-service</text>
+  <text class="s" x="805" y="174" text-anchor="middle">rules R1-R4 · alerts · cases</text>
+  <text class="s" x="805" y="194" text-anchor="middle">STR export</text>
+
+  <!-- Browser to services -->
+  <path class="l" d="M200 225H298"/>
+  <text class="lbl" x="208" y="216">REST + bearer JWT</text>
+  <path class="l" d="M200 262C260 262 250 420 600 420C760 420 805 300 805 242"/>
+  <text class="lbl" x="470" y="412">/aml REST + bearer JWT</text>
+
+  <!-- Kafka -->
+  <rect class="infra" x="610" y="290" width="120" height="56" rx="10"/>
+  <text class="h" x="670" y="318" text-anchor="middle">Kafka</text>
+  <text class="s" x="670" y="336" text-anchor="middle">domain events</text>
+  <path class="l" d="M560 300H608"/>
+  <path class="l" d="M720 290L760 242"/>
+  <path class="l" d="M840 242L760 300 734 312" stroke-dasharray="4 3"/>
+  <text class="lbl" x="800" y="285">freeze requests</text>
+
+  <!-- Data stores -->
+  <rect class="infra" x="300" y="30" width="120" height="56" rx="10"/>
+  <text class="h" x="360" y="56" text-anchor="middle">PostgreSQL</text>
+  <text class="s" x="360" y="74" text-anchor="middle">schema per module</text>
+  <path class="l" d="M360 120V88"/>
+  <rect class="infra" x="440" y="30" width="100" height="56" rx="10"/>
+  <text class="h" x="490" y="56" text-anchor="middle">Redis</text>
+  <text class="s" x="490" y="74" text-anchor="middle">rate limits, cache</text>
+  <path class="l" d="M490 120V88"/>
+  <rect class="infra" x="745" y="30" width="120" height="56" rx="10"/>
+  <text class="h" x="805" y="56" text-anchor="middle">PostgreSQL</text>
+  <text class="s" x="805" y="74" text-anchor="middle">aml schema</text>
+  <path class="l" d="M805 120V88"/>
+
+  <!-- External -->
+  <rect class="ext" x="300" y="390" width="110" height="56" rx="10"/>
+  <text class="h" x="355" y="416" text-anchor="middle">S3</text>
+  <text class="s" x="355" y="434" text-anchor="middle">KYC documents</text>
+  <path class="l" d="M355 350V388"/>
+  <rect class="ext" x="30" y="390" width="170" height="56" rx="10"/>
+  <text class="h" x="115" y="416" text-anchor="middle">Razorpay (test mode)</text>
+  <text class="s" x="115" y="434" text-anchor="middle">checkout, webhooks</text>
+  <path class="l" d="M300 330C250 330 200 360 170 388"/>
+</svg>
