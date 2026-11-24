@@ -25,13 +25,21 @@ injected script can reach, an attacker can reach.
 | Server state | TanStack Query 5 | Caching, retries, loading and error states with little code |
 | UI | Tailwind CSS 4 + shadcn/ui (copied components, Radix Slot, lucide icons) | A professional look without design work |
 | Login | OIDC Authorization Code + PKCE via react-oidc-context (oidc-client-ts) | Standard browser login |
-| Forms (Day 30+) | React Hook Form + Zod | Client-side rules that mirror the backend (PAN, mobile, amount) |
+| Forms (Day 30+) | React Hook Form + Zod, joined by `@hookform/resolvers` | Client-side rules that mirror the backend (PAN, mobile, amount) |
 | Charts (Day 30+) | Recharts | Simple balance and activity charts |
 | Unit tests | Vitest + React Testing Library + MSW | Component tests against mocked API responses |
 | End-to-end | Playwright | Real browser tests, locally and against the live site |
 | Lint | ESLint (typescript-eslint strict-type-checked, react-hooks, react-refresh) | Catches mistakes and enforces the rules below |
 
 Libraries are added on the day they are first used; React Hook Form, Zod and Recharts are not installed in F1.
+Day 30 (F2) added them, plus `@hookform/resolvers`, the official package that connects a Zod schema to React Hook
+Form (`zodResolver`). It is a thin adapter from the React Hook Form authors; writing our own would only re-implement
+it. No other UI dependency was added: input, label, select and progress bar are small local components on native
+elements (no Radix packages).
+
+**Uploads.** `fetch` can't report upload progress, so the API client has one `upload()` method built on
+`XMLHttpRequest`, with the same bearer token, correlation ID and ProblemDetail mapping as every other call. ESLint
+bans `XMLHttpRequest`, like `fetch`, everywhere except `src/api/client.ts`.
 `eslint-plugin-jsx-a11y` was left out because it doesn't support ESLint 10 yet.
 
 **Login.** Keycloak public client `trustledger-web`, Authorization Code with PKCE S256; no implicit flow, no

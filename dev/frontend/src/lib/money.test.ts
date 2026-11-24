@@ -1,4 +1,4 @@
-import { formatPaise, formatRupees, parseRupees, toApiAmount } from './money'
+import { formatMoney, formatRupees, parseRupees, toApiAmount } from './money'
 
 describe('money', () => {
   it.each([
@@ -39,7 +39,7 @@ describe('money', () => {
     [20000000n, '₹2,00,000.00'],
     [-5000000n, '-₹50,000.00'],
   ])('displays %s paise with Indian grouping as %s', (paise, expected) => {
-    expect(formatPaise(paise)).toBe(expected)
+    expect(formatMoney(paise)).toBe(expected)
   })
 
   it('formats an API amount string', () => {

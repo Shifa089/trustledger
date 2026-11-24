@@ -66,8 +66,11 @@ Vitest + React Testing Library + MSW, Playwright, ESLint. Node version in fronte
   npm run typecheck | npm test | npm run build | npm run e2e (built app, no backend) |
   npm run e2e:stack (real Keycloak login; needs TRUSTLEDGER_DEV_USER_PASSWORD) | npm run ci
 - All API calls go through the API client (src/api): it adds the bearer token, X-Correlation-Id and
-  Idempotency-Key, and maps ProblemDetail errorCode to friendly messages. Never call fetch directly
-  (ESLint enforces it). A new backend errorCode needs a message in src/api/errors.ts (a test checks it).
+  Idempotency-Key, and maps ProblemDetail errorCode to friendly messages. Never call fetch or XMLHttpRequest
+  directly (ESLint enforces it; uploads with progress use apiClient.upload). A new backend errorCode needs a message
+  in src/api/errors.ts (a test checks it).
+- Forms: React Hook Form + Zod schemas that mirror the backend validators (src/features/*/schemas.ts); the server
+  stays the authority. Days in India time (src/lib/dates.ts), money via formatMoney/parseRupees (src/lib/money.ts).
 - No money arithmetic with floating point: amounts are decimal strings from the API, bigint paise in
   the browser (src/lib/money.ts). No Number()/parseFloat on money.
 - Tokens never in localStorage or sessionStorage: oidc-client-ts userStore is in memory only.

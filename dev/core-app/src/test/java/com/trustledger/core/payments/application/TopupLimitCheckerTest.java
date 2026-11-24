@@ -193,4 +193,20 @@ class TopupLimitCheckerTest {
                 .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> checker.check(wallet("0.00"), MIN, null)).isInstanceOf(NullPointerException.class);
     }
+
+    // --- usage for display (GET /wallets/me/limit-usage) ---
+
+    @Test
+    void loadedThisMonthCountsOpenAndCapturedTopupsSinceTheFirstInIndia() {
+        loaded(650_000L);
+
+        assertThat(at(NOW).loadedThisMonth(WALLET)).isEqualTo(650_000L);
+        assertThat(TopupStatus.COUNTED_FOR_LOAD)
+                .containsExactlyInAnyOrder(TopupStatus.CREATED, TopupStatus.PENDING, TopupStatus.CAPTURED);
+    }
+
+    @Test
+    void loadedThisMonthNeedsAWallet() {
+        assertThatThrownBy(() -> at(NOW).loadedThisMonth(null)).isInstanceOf(NullPointerException.class);
+    }
 }

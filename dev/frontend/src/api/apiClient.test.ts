@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw/http'
-import { CORE, server } from '@/test/server'
+import { CORE, corsJson, server } from '@/test/server'
 import { createApiClient, CORRELATION_HEADER, IDEMPOTENCY_HEADER } from './client'
 import { ApiError, FRIENDLY_MESSAGES } from './errors'
 
@@ -175,3 +175,96 @@ describe('API client: ProblemDetail errors', () => {
     expect(onUnauthenticated).toHaveBeenCalledOnce()
   })
 })
+
+describe('API client: upload (multipart with progress)', () => {
+  it('posts the form with the bearer token and a correlation ID, and returns the JSON body', async () => {
+    const seen = capture('post', '/kyc/cases/case-1/documents', () => corsJson({ id: 'doc-1', type: 'PAN_CARD' }, 201))
+    const form = new FormData()
+    form.append('type', 'PAN_CARD')
+    form.append('file', new File(['%PDF-1.4'], 'pan.pdf', { type: 'application/pdf' }))
+
+    const result = await client().upload<{ id: string }>('/kyc/cases/case-1/documents', form)
+
+    expect(result.id).toBe('doc-1')
+    expect(seen.request?.headers.get('Authorization')).toBe('Bearer access-token-1')
+    expect(seen.request?.headers.get(CORRELATION_HEADER)).toMatch(UUID)
+    expect(seen.request?.headers.get('Content-Type')).toMatch(/^multipart\/form-data; boundary=/)
+    const body = (await seen.request?.text()) ?? ''
+    expect(body).toMatch(/name="type"\r\n\r\nPAN_CARD/)
+    expect(body).toMatch(/name="file"; filename="pan.pdf"/)
+  })
+
+  it('turns a ProblemDetail into an ApiError with the friendly message', async () => {
+    capture('post', '/kyc/cases/case-1/documents', () =>
+      corsJson({ status: 413, errorCode: 'DOCUMENT_TOO_LARGE', correlationId: 'c-9' }, 413, 'application/problem+json'),
+    )
+
+    const error = await failure(client().upload('/kyc/cases/case-1/documents', new FormData()))
+
+    expect(error.status).toBe(413)
+    expect(error.message).toBe(FRIENDLY_MESSAGES.DOCUMENT_TOO_LARGE)
+    expect(error.correlationId).toBe('c-9')
+  })
+
+  it('reports whole-percent progress from the upload events, ending at 100', async () => {
+    const fake = new FakeXhr()
+    const api = createApiClient({
+      baseUrl: 'http://core.test',
+      getAccessToken: () => 't',
+      xhrFactory: () => fake as unknown as XMLHttpRequest,
+    })
+    const progress: number[] = []
+
+    const done = api.upload('/kyc/cases/c/documents', new FormData(), { onProgress: (p) => progress.push(p) })
+    await vi.waitFor(() => {
+      expect(fake.sent).toBe(true)
+    })
+    fake.progress(1, 3)
+    fake.progress(2, 3)
+    fake.respond(201, '{"id":"d"}')
+
+    await expect(done).resolves.toEqual({ id: 'd' })
+    expect(progress).toEqual([33, 66, 100])
+    expect(fake.headers.Authorization).toBe('Bearer t')
+    expect(fake.url).toBe('http://core.test/api/v1/kyc/cases/c/documents')
+  })
+})
+
+/** Just enough of XMLHttpRequest to drive progress by hand. */
+class FakeXhr {
+  headers: Record<string, string> = {}
+  url = ''
+  sent = false
+  status = 0
+  responseText = ''
+  withCredentials = true
+  upload: { onprogress: ((event: { lengthComputable: boolean; loaded: number; total: number }) => void) | null } = {
+    onprogress: null,
+  }
+  onload: (() => void) | null = null
+  onerror: (() => void) | null = null
+  onabort: (() => void) | null = null
+  open(_method: string, url: string) {
+    this.url = url
+  }
+  setRequestHeader(name: string, value: string) {
+    this.headers[name] = value
+  }
+  getResponseHeader() {
+    return null
+  }
+  send() {
+    this.sent = true
+  }
+  abort() {
+    this.onabort?.()
+  }
+  progress(loaded: number, total: number) {
+    this.upload.onprogress?.({ lengthComputable: true, loaded, total })
+  }
+  respond(status: number, body: string) {
+    this.status = status
+    this.responseText = body
+    this.onload?.()
+  }
+}

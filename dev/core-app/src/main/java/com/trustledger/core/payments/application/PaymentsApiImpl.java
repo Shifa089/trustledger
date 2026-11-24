@@ -1,5 +1,6 @@
 package com.trustledger.core.payments.application;
 
+import com.trustledger.core.payments.LimitUsage;
 import com.trustledger.core.payments.PaymentsApi;
 import com.trustledger.core.payments.TopupRecord;
 import com.trustledger.core.payments.TransactionCursor;
@@ -14,6 +15,7 @@ import com.trustledger.core.payments.domain.TopupStatus;
 import com.trustledger.core.payments.domain.Transfer;
 import com.trustledger.core.payments.domain.TransferRepository;
 import com.trustledger.core.payments.domain.TransferStatus;
+import com.trustledger.core.shared.Money;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
@@ -32,9 +34,14 @@ class PaymentsApiImpl implements PaymentsApi {
     private final TransferRepository transfers;
     private final TopupRepository topups;
     private final WalletTransactionQueryService history;
+    private final LimitChecker transferLimits;
+    private final TopupLimitChecker topupLimits;
 
-    PaymentsApiImpl(TransferRepository transfers, TopupRepository topups, WalletTransactionQueryService history) {
+    PaymentsApiImpl(TransferRepository transfers, TopupRepository topups, WalletTransactionQueryService history,
+            LimitChecker transferLimits, TopupLimitChecker topupLimits) {
         this.history = history;
+        this.transferLimits = transferLimits;
+        this.topupLimits = topupLimits;
         this.transfers = transfers;
         this.topups = topups;
     }
@@ -71,6 +78,17 @@ class PaymentsApiImpl implements PaymentsApi {
     @Override
     public TransactionSlice transactionsAfter(TransactionFilter filter, TransactionCursor after, int size) {
         return history.after(filter, after, size);
+    }
+
+    /** One read-only transaction, so the three sums see the same snapshot. */
+    @Override
+    @Transactional(readOnly = true)
+    public LimitUsage limitUsage(UUID walletId) {
+        Objects.requireNonNull(walletId, "walletId");
+        LimitChecker.TransferUsage transfersUsed = transferLimits.usage(walletId);
+        return new LimitUsage(Money.of(transfersUsed.todayMinor(), Money.INR),
+                Money.of(transfersUsed.thisMonthMinor(), Money.INR),
+                Money.of(topupLimits.loadedThisMonth(walletId), Money.INR));
     }
 
     static TransferRecord record(Transfer transfer) {

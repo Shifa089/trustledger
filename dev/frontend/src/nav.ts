@@ -9,13 +9,13 @@ export interface NavItem {
   soon?: boolean
 }
 
-/** Navigation per actor (SPEC §2). The screens behind `soon` items arrive in Days 30-33. */
+/** Navigation per actor (SPEC §2). The screens behind `soon` items arrive in Days 31-33. */
 export const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Dashboard', to: '/customer', roles: ['CUSTOMER'] },
-  { label: 'KYC', to: '/customer/kyc', roles: ['CUSTOMER'], soon: true },
+  { label: 'KYC', to: '/customer/kyc', roles: ['CUSTOMER'] },
   { label: 'Add money', to: '/customer/add-money', roles: ['CUSTOMER'], soon: true },
   { label: 'Send money', to: '/customer/send', roles: ['CUSTOMER'], soon: true },
-  { label: 'History', to: '/customer/history', roles: ['CUSTOMER'], soon: true },
+  { label: 'History', to: '/customer/history', roles: ['CUSTOMER'] },
   { label: 'Privacy', to: '/customer/privacy', roles: ['CUSTOMER'], soon: true },
 
   { label: 'Compliance', to: '/compliance', roles: ['COMPLIANCE_OFFICER'] },

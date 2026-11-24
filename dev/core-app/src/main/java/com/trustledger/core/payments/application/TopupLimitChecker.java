@@ -13,6 +13,7 @@ import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 /**
@@ -98,6 +99,15 @@ public class TopupLimitChecker {
     }
 
     /** Start of the limit month that contains {@code now}, in the limit zone. */
+    /**
+     * Money added this month that counts against the monthly load, in minor units: the sum {@link #check} compares
+     * with the limit (open top-ups included). For display; no lock needed.
+     */
+    long loadedThisMonth(UUID walletId) {
+        Objects.requireNonNull(walletId, "walletId");
+        return topups.sumCreatedSince(walletId, monthStart(clock.instant()), TopupStatus.COUNTED_FOR_LOAD);
+    }
+
     Instant monthStart(Instant now) {
         return now.atZone(zone).toLocalDate().withDayOfMonth(1).atStartOfDay(zone).toInstant();
     }

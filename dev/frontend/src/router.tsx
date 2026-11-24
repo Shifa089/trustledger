@@ -4,10 +4,14 @@ import { RequireRole } from '@/auth/RequireRole'
 import { AppLayout } from '@/layouts/AppLayout'
 import { PublicLayout } from '@/layouts/PublicLayout'
 import { RootLayout } from '@/layouts/RootLayout'
+import { FullKycPage } from '@/features/kyc/FullKycPage'
+import { KycStatusPage } from '@/features/kyc/KycStatusPage'
+import { MinKycPage } from '@/features/kyc/MinKycPage'
+import { TransactionHistory } from '@/features/history/TransactionHistory'
+import { WalletDashboard } from '@/features/wallet/WalletDashboard'
 import { AdminHome } from '@/pages/admin/AdminHome'
 import { AuditHome } from '@/pages/audit/AuditHome'
 import { ComplianceHome } from '@/pages/compliance/ComplianceHome'
-import { CustomerHome } from '@/pages/customer/CustomerHome'
 import { LandingPage } from '@/pages/LandingPage'
 import { AppHomeRedirect, CallbackPage, ForbiddenPage, NotFoundPage } from '@/pages/StatusPages'
 
@@ -38,7 +42,13 @@ export const routes: RouteObject[] = [
               {
                 path: 'customer',
                 element: <RequireRole roles={['CUSTOMER']} />,
-                children: [{ index: true, element: <CustomerHome /> }],
+                children: [
+                  { index: true, element: <WalletDashboard /> },
+                  { path: 'kyc', element: <KycStatusPage /> },
+                  { path: 'kyc/min', element: <MinKycPage /> },
+                  { path: 'kyc/full', element: <FullKycPage /> },
+                  { path: 'history', element: <TransactionHistory /> },
+                ],
               },
               {
                 path: 'compliance',

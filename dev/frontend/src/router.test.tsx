@@ -69,6 +69,21 @@ describe('routes', () => {
     expect(router.state.location.pathname).toBe('/forbidden')
   })
 
+  it.each([
+    ['/customer/kyc', 'KYC'],
+    ['/customer/kyc/min', 'KYC'],
+    ['/customer/kyc/full', 'KYC'],
+    ['/customer/history', 'History'],
+  ])('links %s in the customer navigation and keeps it for customers only', async (path, navLabel) => {
+    const { unmount } = renderRoutes(routes, { path: '/customer', auth: fakeAuth(['CUSTOMER']).auth })
+    expect(await mainNav().findByRole('link', { name: navLabel })).toHaveAttribute('href', path.startsWith('/customer/kyc') ? '/customer/kyc' : path)
+    unmount()
+
+    const { router } = renderRoutes(routes, { path, auth: fakeAuth(['COMPLIANCE_OFFICER']).auth })
+    expect(await screen.findByRole('heading', { name: 'Not available for your role' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/forbidden')
+  })
+
   it('loads the profile from core-app and open cases from the AML service', async () => {
     renderRoutes(routes, { path: '/compliance', auth: fakeAuth(['COMPLIANCE_OFFICER']).auth })
 

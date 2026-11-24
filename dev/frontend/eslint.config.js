@@ -6,12 +6,13 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 // The frontend rules from CLAUDE.md, enforced where a linter can:
-// - all API calls go through the API client: fetch only inside src/api/
+// - all API calls go through the API client: fetch and XMLHttpRequest only inside src/api/client.ts
 // - tokens never in localStorage/sessionStorage: both globals banned (src/auth/oidc.ts has the one
 //   documented exception, the PKCE state store, which never holds a token)
 // - no money arithmetic with floating point: parseFloat banned; use src/lib/money.ts
 const restrictedGlobals = [
   { name: 'fetch', message: 'Call the backend through the API client (src/api), never fetch directly.' },
+  { name: 'XMLHttpRequest', message: 'Upload through the API client (apiClient.upload), never XMLHttpRequest directly.' },
   { name: 'localStorage', message: 'Tokens and personal data never go to localStorage.' },
   { name: 'sessionStorage', message: 'Tokens and personal data never go to sessionStorage.' },
   { name: 'parseFloat', message: 'Money is never a float: use parseRupees/formatRupees from src/lib/money.ts.' },
@@ -52,7 +53,10 @@ export default defineConfig([
     // The API client is the one place that talks HTTP.
     files: ['src/api/client.ts'],
     rules: {
-      'no-restricted-globals': ['error', ...restrictedGlobals.filter((g) => g.name !== 'fetch')],
+      'no-restricted-globals': [
+        'error',
+        ...restrictedGlobals.filter((g) => g.name !== 'fetch' && g.name !== 'XMLHttpRequest'),
+      ],
     },
   },
   {

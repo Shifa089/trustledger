@@ -34,7 +34,15 @@ export interface ApiClientOptions {
   /** Called after any 401, e.g. to start a new sign-in. */
   onUnauthenticated?: () => void
   fetchFn?: typeof fetch
+  /** For uploads: fetch can't report upload progress, XMLHttpRequest can. Tests pass a fake. */
+  xhrFactory?: () => XMLHttpRequest
   newCorrelationId?: () => string
+}
+
+export interface UploadOptions {
+  /** Whole percent sent so far, 0-100. */
+  onProgress?: (percent: number) => void
+  signal?: AbortSignal
 }
 
 export interface ApiClient {
@@ -44,6 +52,8 @@ export interface ApiClient {
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) => Promise<T>
   /** For files (statement PDF, STR CSV): the raw body plus the server's file name, if it sent one. */
   download: (path: string, options?: Omit<RequestOptions, 'body'>) => Promise<{ blob: Blob; fileName?: string }>
+  /** A multipart POST with upload progress (KYC documents). Same headers and errors as every other call. */
+  upload: <T>(path: string, form: FormData, options?: UploadOptions) => Promise<T>
 }
 
 export function buildUrl(baseUrl: string, path: string, query?: Record<string, QueryValue>): string {
@@ -93,18 +103,67 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       throw new ApiError(0, {}, correlationId)
     }
     if (!response.ok) {
-      const problem = toProblemDetail(await readJson(response))
-      if (response.status === 401) {
-        options.onUnauthenticated?.()
-      }
-      const fallbackCode = statusFallback(response.status)
-      if (problem.errorCode === undefined && fallbackCode !== undefined) {
-        problem.errorCode = fallbackCode
-      }
-      const echoed = response.headers.get(CORRELATION_HEADER) ?? correlationId
-      throw new ApiError(response.status, problem, echoed)
+      throw failure(response.status, await response.text(), response.headers.get(CORRELATION_HEADER), correlationId)
     }
     return response
+  }
+
+  /** A non-2xx answer as an ApiError, for fetch and XHR alike. */
+  function failure(status: number, bodyText: string, echoedId: string | null, sentId: string): ApiError {
+    const problem = toProblemDetail(parseJson(bodyText))
+    if (status === 401) {
+      options.onUnauthenticated?.()
+    }
+    const fallbackCode = statusFallback(status)
+    if (problem.errorCode === undefined && fallbackCode !== undefined) {
+      problem.errorCode = fallbackCode
+    }
+    return new ApiError(status, problem, echoedId ?? sentId)
+  }
+
+  async function upload<T>(path: string, form: FormData, req: UploadOptions = {}): Promise<T> {
+    const correlationId = newCorrelationId()
+    const token = await options.getAccessToken()
+    const xhr = options.xhrFactory?.() ?? new XMLHttpRequest()
+    return new Promise<T>((resolve, reject) => {
+      xhr.open('POST', buildUrl(options.baseUrl, path))
+      xhr.setRequestHeader('Accept', 'application/json, application/problem+json')
+      xhr.setRequestHeader(CORRELATION_HEADER, correlationId)
+      if (token !== undefined && token !== '') {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      }
+      xhr.withCredentials = false
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && event.total > 0) {
+          req.onProgress?.(Math.min(100, Math.floor((event.loaded * 100) / event.total)))
+        }
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          req.onProgress?.(100)
+          resolve((xhr.status === 204 ? undefined : parseJson(xhr.responseText)) as T)
+        } else {
+          reject(failure(xhr.status, xhr.responseText, xhr.getResponseHeader(CORRELATION_HEADER), correlationId))
+        }
+      }
+      xhr.onerror = () => {
+        reject(new ApiError(0, {}, correlationId))
+      }
+      xhr.onabort = () => {
+        reject(new DOMException('The upload was cancelled.', 'AbortError'))
+      }
+      if (req.signal !== undefined) {
+        if (req.signal.aborted) {
+          xhr.abort()
+          return
+        }
+        req.signal.addEventListener('abort', () => {
+          xhr.abort()
+        })
+      }
+      // No Content-Type: the browser sets multipart/form-data with its boundary.
+      xhr.send(form)
+    })
   }
 
   async function request<T>(path: string, req: RequestOptions = {}): Promise<T> {
@@ -112,7 +171,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     if (response.status === 204) {
       return undefined as T
     }
-    return (await readJson(response)) as T
+    return parseJson(await response.text()) as T
   }
 
   return {
@@ -126,11 +185,11 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       const blob = await response.blob()
       return fileName === undefined ? { blob } : { blob, fileName }
     },
+    upload,
   }
 }
 
-async function readJson(response: Response): Promise<unknown> {
-  const text = await response.text()
+function parseJson(text: string): unknown {
   if (text === '') {
     return undefined
   }

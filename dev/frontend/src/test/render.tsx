@@ -47,7 +47,7 @@ export function fakeAuth(roles?: readonly Role[], username = 'customer1'): FakeA
 
 export function renderRoutes(
   routes: RouteObject[],
-  { path, auth }: { path: string; auth: AuthContextProps },
+  { path, auth }: { path: string | { pathname: string; search?: string; state?: unknown }; auth: AuthContextProps },
 ): RenderResult & { router: ReturnType<typeof createMemoryRouter> } {
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
