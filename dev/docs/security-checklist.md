@@ -242,9 +242,14 @@ libraries.
 - `EndpointAuthorizationCoverageIT`, `AmlEndpointAuthorizationCoverageIT`
 - `ApiVersioningIT` (`openApiDocumentListsVersionedPathAndBearerScheme`, `unversionedPathIsDeniedByDefault`)
 
-**Gaps:** `SecurityConfig` has a rule for `GET /api/*/admin/ledger/accounts/*/balance` (ADMIN, AUDITOR) from the
-SPEC, but no controller serves it yet. Only a test probe does. The rule is harmless because there is no handler,
-but it should get its endpoint or be removed.
+**Gaps:** none left from Day 25 (closed on Day 26 B):
+- `GET /admin/ledger/accounts/{code}/balance` now has its controller (`LedgerAccountController`, ADMIN and AUDITOR
+  by URL rule and `@PreAuthorize`). The test probe for it is gone.
+- `GET /aml/alerts` is built with its own rule.
+- Both OpenAPI documents (core and AML) are generated from the code.
+
+Springdoc is still on outside `local` (behind a token). Switching it off in a deployed profile belongs to the
+deferred AWS half of M14.
 
 ## API10:2023 Unsafe Consumption of APIs
 

@@ -22,14 +22,15 @@ only.
 | [topups.http](topups.http) | Razorpay test-mode top-ups and the webhook signature check |
 | [history.http](history.http) | Transaction history: filters, sort, offset and keyset pages |
 | [privacy.http](privacy.http) | Data export, erasure, request status |
-| [audit.http](audit.http) | Audit events and hash-chain verification (auditor1) |
+| [audit.http](audit.http) | Audit events, hash-chain verification and ledger-derived account balances (auditor1) |
 | [admin.http](admin.http) | Reconciliation run and its metric (admin1) |
 | [aml-demo.http](aml-demo.http) | The AML story: structuring top-ups, automatic freeze, case, escalation, STR CSV ([docs/aml-demo.md](../docs/aml-demo.md)) |
 | [aml-cases.http](aml-cases.http) | The other case branch (close as false positive), filters, refused transitions |
 
 ## Every SPEC §5 endpoint
 
-Base path `/api/v1`. "Not built" endpoints are in the files too, with the answer they give today.
+Base path `/api/v1`. The two deferred endpoints (PDF statements, AI case summary) are in the files too, with the answer
+they give today.
 
 | Method | Path | Role | File |
 | --- | --- | --- | --- |
@@ -55,13 +56,13 @@ Base path `/api/v1`. "Not built" endpoints are in the files too, with the answer
 | GET | `/topups/{id}` | CUSTOMER (owner) | topups.http |
 | POST | `/webhooks/razorpay` | Public (HMAC) | topups.http (bad signatures); signed ones: `scripts/aml-demo-webhooks.sh capture` |
 | POST | `/admin/reconciliation/run` | ADMIN | admin.http |
-| GET | `/admin/ledger/accounts/{code}/balance` | ADMIN, AUDITOR | audit.http (**not built**: 404) |
+| GET | `/admin/ledger/accounts/{code}/balance` | ADMIN, AUDITOR | audit.http |
 | GET | `/audit/events` | AUDITOR | audit.http |
 | GET | `/audit/verify` | AUDITOR | audit.http |
 | POST | `/me/data-export` | CUSTOMER | privacy.http |
 | POST | `/me/erasure-request` | CUSTOMER | privacy.http |
 | GET | `/me/data-requests` | CUSTOMER | privacy.http |
-| GET | `/aml/alerts` (port 8081) | COMPLIANCE_OFFICER | aml-cases.http (**not built**: 403) |
+| GET | `/aml/alerts` (port 8081) | COMPLIANCE_OFFICER | aml-cases.http |
 | GET | `/aml/cases`, `/aml/cases/{id}` (port 8081) | COMPLIANCE_OFFICER | aml-demo.http, aml-cases.http |
 | POST | `/aml/cases/{id}/assign`, `/close`, `/escalate` (port 8081) | COMPLIANCE_OFFICER | aml-demo.http, aml-cases.http |
 | GET | `/aml/cases/{id}/str-report` (port 8081) | COMPLIANCE_OFFICER | aml-demo.http |

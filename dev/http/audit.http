@@ -41,7 +41,19 @@ Authorization: Bearer {{customer1_token}}
 ### No token -> 401
 GET {{api}}/api/v1/audit/events
 
-### NOT BUILT YET (SPEC §5): ledger-derived balance of one account, ADMIN or AUDITOR. SecurityConfig already has its
-# role rule, so an auditor passes security and gets 404 NOT_FOUND (no handler); a customer gets 403.
+### auditor1: ledger-derived balance of one account (FR-L-2), ADMIN or AUDITOR, summed from the journal, never cached
+# -> 200 {accountCode, normalSide, balance (signed decimal string: suspense may be below zero), currency, asOf}
 GET {{api}}/api/v1/admin/ledger/accounts/PLATFORM:SUSPENSE/balance
 Authorization: Bearer {{auditor1_token}}
+
+### auditor1: the gateway clearing account (an asset, normalSide DEBIT) -> 200
+GET {{api}}/api/v1/admin/ledger/accounts/PLATFORM:GATEWAY_CLEARING/balance
+Authorization: Bearer {{auditor1_token}}
+
+### auditor1: unknown account -> 404 NOT_FOUND; malformed code (e.g. CASH, lower case) -> 400 VALIDATION_FAILED
+GET {{api}}/api/v1/admin/ledger/accounts/WALLET:00000000-0000-7000-8000-000000000000/balance
+Authorization: Bearer {{auditor1_token}}
+
+### customer1: not for customers -> 403 ACCESS_DENIED
+GET {{api}}/api/v1/admin/ledger/accounts/PLATFORM:SUSPENSE/balance
+Authorization: Bearer {{customer1_token}}

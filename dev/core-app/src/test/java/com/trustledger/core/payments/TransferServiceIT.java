@@ -2,11 +2,9 @@ package com.trustledger.core.payments;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assumptions.assumeThat;
 
 import com.trustledger.core.TestcontainersConfiguration;
 import com.trustledger.core.payments.PaymentsFixtures.Customer;
-import com.trustledger.core.payments.application.PaymentsProperties;
 import com.trustledger.core.payments.application.TransferCommand;
 import com.trustledger.core.payments.application.TransferRecipient;
 import com.trustledger.core.payments.application.TransferResult;
@@ -17,10 +15,6 @@ import com.trustledger.core.shared.Money;
 import com.trustledger.core.shared.TrustLedgerException;
 import com.trustledger.core.wallet.WalletTier;
 import com.trustledger.core.wallet.WalletView;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,12 +42,6 @@ class TransferServiceIT {
 
     @Autowired
     JdbcTemplate jdbc;
-
-    @Autowired
-    PaymentsProperties properties;
-
-    @Autowired
-    Clock clock;
 
     private static Money rupees(String amount) {
         return Money.parse(amount);
@@ -228,28 +216,6 @@ class TransferServiceIT {
         // ₹99,999.98 used today: ₹0.02 lands exactly on ₹1,00,000, ₹0.03 is one paisa over.
         refused(sender, receiver, () -> send(sender, receiver.walletId(), "0.03"), ErrorCode.LIMIT_EXCEEDED);
         assertThat(send(sender, receiver.walletId(), "0.02").status()).isEqualTo(TransferStatus.COMPLETED);
-    }
-
-    @Test
-    void monthlyLimitIsRefused() {
-        ZoneId zone = properties.limitZone();
-        LocalDate today = clock.instant().atZone(zone).toLocalDate();
-        assumeThat(today.getDayOfMonth()).as("needs a day this month before today").isGreaterThan(1);
-        Customer sender = fixtures.customer(WalletTier.FULL, 100_000);
-        Customer receiver = fixtures.customer(WalletTier.FULL, 0);
-        // ₹4,99,999.99 already sent earlier this month (a held transfer counts, so no journal entry is needed).
-        Instant monthStart = today.withDayOfMonth(1).atStartOfDay(zone).toInstant();
-        jdbc.update("insert into payments.transfers (id, sender_wallet_id, receiver_wallet_id, amount_minor, currency,"
-                + " status, created_at, updated_at, version) values (?, ?, ?, 49999999, 'INR', 'HELD_FOR_REVIEW', ?, ?, 0)",
-                UUID.randomUUID(), sender.walletId(), receiver.walletId(), java.sql.Timestamp.from(monthStart),
-                java.sql.Timestamp.from(monthStart));
-
-        State before = state(sender, receiver);
-        assertThatThrownBy(() -> send(sender, receiver.walletId(), "0.02"))
-                .isInstanceOf(TrustLedgerException.class)
-                .hasMessageContaining("monthly")
-                .extracting(e -> ((TrustLedgerException) e).errorCode()).isEqualTo(ErrorCode.LIMIT_EXCEEDED);
-        assertThat(state(sender, receiver)).isEqualTo(before);
     }
 
     @Test

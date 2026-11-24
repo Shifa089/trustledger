@@ -108,9 +108,12 @@ class EndpointAuthorizationCoverageIT {
             Map.entry("GET /api/v1/me/data-requests", CUSTOMER),
             // audit
             Map.entry("GET /api/v1/audit/events", AUDITOR),
-            Map.entry("GET /api/v1/audit/verify", AUDITOR));
+            Map.entry("GET /api/v1/audit/verify", AUDITOR),
+            // ledger
+            Map.entry("GET /api/v1/admin/ledger/accounts/{code}/balance", EnumSet.of(Caller.ADMIN, Caller.AUDITOR)));
 
     private static final Pattern HAS_ROLE = Pattern.compile("^hasRole\\('([A-Z_]+)'\\)$");
+    private static final Pattern HAS_ANY_ROLE = Pattern.compile("^hasAnyRole\\(('[A-Z_]+'(?:, *'[A-Z_]+')*)\\)$");
     private static final Pattern PATH_VARIABLE = Pattern.compile("\\{[^}]+}");
     private static final String SAMPLE_ID = "00000000-0000-7000-8000-000000000001";
 
@@ -244,13 +247,24 @@ class EndpointAuthorizationCoverageIT {
                         PreAuthorize.class);
     }
 
-    /** The callers an expression grants, for the two forms our controllers use; {@code null} for any other. */
+    /** The callers an expression grants, for the three forms our controllers use; {@code null} for any other. */
     private static Set<Caller> grantedBy(String expression) {
         if ("isAuthenticated()".equals(expression)) {
             return EnumSet.copyOf(SIGNED_IN);
         }
         Matcher role = HAS_ROLE.matcher(expression);
-        return role.matches() ? EnumSet.of(Caller.valueOf(role.group(1))) : null;
+        if (role.matches()) {
+            return EnumSet.of(Caller.valueOf(role.group(1)));
+        }
+        Matcher anyRole = HAS_ANY_ROLE.matcher(expression);
+        if (anyRole.matches()) {
+            Set<Caller> callers = EnumSet.noneOf(Caller.class);
+            for (String quoted : anyRole.group(1).split(",")) {
+                callers.add(Caller.valueOf(quoted.strip().replace("'", "")));
+            }
+            return callers;
+        }
+        return null;
     }
 
     /** A Keycloak-shaped token run through the production {@link JwtRoleConverter}, or an anonymous caller. */

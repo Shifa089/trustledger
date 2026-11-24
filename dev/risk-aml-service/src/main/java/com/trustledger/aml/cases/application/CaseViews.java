@@ -38,6 +38,20 @@ public final class CaseViews {
     public record CasePage(List<CaseSummary> content, int page, int size, long totalElements, int totalPages) {
     }
 
+    /** One line of the alert list ({@code GET /aml/alerts}): the rule hit and the case it joined. */
+    public record AlertSummary(UUID id, UUID caseId, UUID walletId, String ruleCode, Severity severity,
+            String details, Instant createdAt) {
+
+        static AlertSummary of(Alert alert) {
+            return new AlertSummary(alert.getId(), alert.getCaseId(), alert.getWalletId(), alert.getRuleCode(),
+                    alert.getSeverity(), alert.getDetails(), alert.getCreatedAt());
+        }
+    }
+
+    /** A page of alerts, newest first. */
+    public record AlertPage(List<AlertSummary> content, int page, int size, long totalElements, int totalPages) {
+    }
+
     /** The case with its evidence: alerts, freeze requests and the wallet's facts around the alerts. */
     public record CaseDetail(UUID id, UUID walletId, CaseStatus status, UUID assignedTo, String resolution,
             Instant createdAt, Instant updatedAt, List<AlertItem> alerts, List<FreezeRequestItem> freezeRequests,

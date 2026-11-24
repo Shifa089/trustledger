@@ -22,6 +22,9 @@ logging:
   pattern:
     correlation: "[%X{correlationId:-}] [%X{traceId:-},%X{spanId:-}] "
 trustledger:
+  # Swagger UI at http://localhost:8081/swagger-ui.html without a token (local only, as in core-app).
+  security:
+    swagger-public: true
   aml:
     kafka:
       # The compose broker doesn't auto-create topics.

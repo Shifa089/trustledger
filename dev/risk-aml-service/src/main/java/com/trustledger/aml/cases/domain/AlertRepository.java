@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 /** Port for {@code aml.alerts}. Append-only: no update, no delete. */
 public interface AlertRepository {
@@ -17,4 +19,7 @@ public interface AlertRepository {
 
     /** The alerts of one page of cases, for the counts in the case list. */
     List<Alert> findByCaseIdIn(Collection<UUID> caseIds);
+
+    /** The alert list (SPEC §5 {@code GET /aml/alerts}): newest first, then by ID, so pages are stable. */
+    Page<Alert> search(AlertFilter filter, Pageable pageable);
 }
