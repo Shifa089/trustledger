@@ -4,8 +4,14 @@ export function AdminHome() {
   return (
     <SectionHome
       title="Admin"
-      intro="Operations: reconciliation and ledger account balances."
-      upcoming={['Run reconciliation and see the result', 'Ledger-derived account balances']}
+      intro="Operations: reconciliation of wallet balances against the ledger."
+      links={[
+        {
+          to: '/admin/reconciliation',
+          label: 'Reconciliation',
+          description: 'Run the nightly balance check now and see any mismatch.',
+        },
+      ]}
     />
   )
 }

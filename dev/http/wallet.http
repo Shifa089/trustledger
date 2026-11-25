@@ -15,6 +15,10 @@ Authorization: Bearer {{customer1_token}}
 GET {{api}}/api/v1/wallets/me/limit-usage
 Authorization: Bearer {{customer1_token}}
 
+### officer1: read customer1's wallet (Day 32) -> 200 {status, balances, currentFreeze or null}. Unknown ID -> 404.
+GET {{api}}/api/v1/compliance/wallets/{{wallet_id}}
+Authorization: Bearer {{officer1_token}}
+
 ### officer1: freeze customer1's wallet -> 200 {status FROZEN, currentFreeze {source COMPLIANCE, reason}}
 # Second run -> 409 INVALID_STATE_TRANSITION. Without a reason -> 400.
 POST {{api}}/api/v1/compliance/wallets/{{wallet_id}}/freeze

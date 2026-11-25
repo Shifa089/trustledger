@@ -167,6 +167,42 @@ class WalletControllerIT {
         me(customerSubject).andExpect(jsonPath("$.status").value("FROZEN"));
     }
 
+    // --- GET /compliance/wallets/{id} (Day 32: the compliance console reads a wallet before acting) ---
+
+    @Test
+    void officerReadsAnyWalletWithItsOpenFreeze() throws Exception {
+        UUID walletId = fixtures.wallet(WalletTier.FULL);
+        fixtures.fund(walletId, 150_050);
+        String officerSubject = ApiMockMvc.newSubject();
+        UUID officerId = fixtures.user(officerSubject);
+
+        mvc.perform(get("/api/v1/compliance/wallets/{id}", walletId).with(officer(officerSubject)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.walletId").value(walletId.toString()))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.tier").value("FULL"))
+                .andExpect(jsonPath("$.balance").value("1500.50"))
+                .andExpect(jsonPath("$.currentFreeze").value(nullValue()));
+
+        freeze(officerSubject, walletId, "Bank reported fraud").andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/compliance/wallets/{id}", walletId).with(officer(officerSubject)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FROZEN"))
+                .andExpect(jsonPath("$.currentFreeze.source").value("COMPLIANCE"))
+                .andExpect(jsonPath("$.currentFreeze.frozenBy").value(officerId.toString()));
+    }
+
+    @Test
+    void readingAnUnknownWalletIsNotFoundAndCustomersAreRefused() throws Exception {
+        mvc.perform(get("/api/v1/compliance/wallets/{id}", UUID.randomUUID()).with(officer(ApiMockMvc.newSubject())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("NOT_FOUND"));
+        UUID walletId = fixtures.wallet(WalletTier.FULL);
+        mvc.perform(get("/api/v1/compliance/wallets/{id}", walletId).with(customer(ApiMockMvc.newSubject())))
+                .andExpect(status().isForbidden());
+    }
+
     @Test
     void freezingTwiceIsAConflict() throws Exception {
         UUID walletId = fixtures.wallet(WalletTier.FULL);

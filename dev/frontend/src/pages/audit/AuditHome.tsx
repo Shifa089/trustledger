@@ -5,7 +5,13 @@ export function AuditHome() {
     <SectionHome
       title="Audit"
       intro="Read-only access to the tamper-evident audit trail."
-      upcoming={['Audit log viewer with filters', '"Verify chain": walk the hash chain and show the first broken link']}
+      links={[
+        {
+          to: '/audit/events',
+          label: 'Audit log',
+          description: 'Every state-changing action with filters, and "Verify chain" to check the hash chain.',
+        },
+      ]}
     />
   )
 }

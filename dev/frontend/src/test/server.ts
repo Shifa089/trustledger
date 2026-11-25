@@ -4,6 +4,7 @@ import type { KycOverview, LimitUsage, MyWallet, TransactionHistory } from '@/ap
 
 /** The base URLs that vite.config.ts gives the tests (test.env). */
 export const CORE = 'http://core.test/api/v1'
+const EMPTY_ITEMS = { items: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }
 export const AML = 'http://aml.test/api/v1'
 
 /** A FULL-tier wallet: ₹1,500.50 balance, ₹250.00 held (fake data). */
@@ -95,6 +96,11 @@ export const handlers = [
   http.get(`${AML}/aml/cases`, () =>
     HttpResponse.json({ content: [], page: 0, size: 1, totalElements: 3, totalPages: 3 }),
   ),
+  // Staff lists (Day 32): empty unless a test says otherwise.
+  http.get(`${CORE}/compliance/kyc-cases`, () => HttpResponse.json(EMPTY_ITEMS)),
+  http.get(`${CORE}/compliance/transfers`, () => HttpResponse.json(EMPTY_ITEMS)),
+  http.get(`${CORE}/audit/events`, () => HttpResponse.json(EMPTY_ITEMS)),
+  http.get(`${AML}/aml/alerts`, () => HttpResponse.json({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 })),
 ]
 
 export const server = setupServer(...handlers)

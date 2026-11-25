@@ -40,7 +40,8 @@ test.describe('@stack login', () => {
 
     await expect(page).toHaveURL(/\/audit$/)
     const nav = page.getByRole('navigation', { name: 'Main' })
-    await expect(nav.getByRole('link', { name: 'Audit' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Audit', exact: true })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Audit log' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Dashboard' })).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Sign out' }).click()

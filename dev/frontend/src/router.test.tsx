@@ -97,6 +97,41 @@ describe('routes', () => {
     expect(screen.getByRole('status', { name: 'Test mode' })).toBeInTheDocument()
   })
 
+  it.each([
+    ['/compliance/kyc', 'CUSTOMER'],
+    ['/compliance/kyc/00000000-0000-7000-8000-0000000000c1', 'CUSTOMER'],
+    ['/compliance/transfers', 'ADMIN'],
+    ['/compliance/wallets', 'AUDITOR'],
+    ['/compliance/aml', 'CUSTOMER'],
+    ['/compliance/aml/cases/00000000-0000-7000-8000-00000000ca01', 'ADMIN'],
+    ['/admin/reconciliation', 'COMPLIANCE_OFFICER'],
+    ['/admin/reconciliation', 'AUDITOR'],
+    ['/audit/events', 'COMPLIANCE_OFFICER'],
+    ['/audit/events', 'CUSTOMER'],
+  ] as const)('refuses %s to a %s (typed URL)', async (path, role) => {
+    const { router } = renderRoutes(routes, { path, auth: fakeAuth([role]).auth })
+    expect(await screen.findByRole('heading', { name: 'Not available for your role' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/forbidden')
+  })
+
+  it.each([
+    ['COMPLIANCE_OFFICER', 'KYC queue', '/compliance/kyc'],
+    ['COMPLIANCE_OFFICER', 'Held transfers', '/compliance/transfers'],
+    ['COMPLIANCE_OFFICER', 'Wallets', '/compliance/wallets'],
+    ['COMPLIANCE_OFFICER', 'AML alerts', '/compliance/aml'],
+    ['COMPLIANCE_OFFICER', 'AML cases', '/compliance/aml/cases'],
+    ['ADMIN', 'Reconciliation', '/admin/reconciliation'],
+    ['AUDITOR', 'Audit log', '/audit/events'],
+  ] as const)('gives a %s the "%s" screen at %s', async (role, label, path) => {
+    const home = role === 'COMPLIANCE_OFFICER' ? '/compliance' : role === 'ADMIN' ? '/admin' : '/audit'
+    const { unmount } = renderRoutes(routes, { path: home, auth: fakeAuth([role]).auth })
+    expect(await mainNav().findByRole('link', { name: label })).toHaveAttribute('href', path)
+    unmount()
+    const { router } = renderRoutes(routes, { path, auth: fakeAuth([role]).auth })
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe(path)
+  })
+
   it('loads the profile from core-app and open cases from the AML service', async () => {
     renderRoutes(routes, { path: '/compliance', auth: fakeAuth(['COMPLIANCE_OFFICER']).auth })
 
