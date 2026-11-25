@@ -14,6 +14,7 @@ import java.util.UUID;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -46,6 +47,12 @@ public class ComplianceWalletController {
     public ComplianceWalletController(Callers callers, WalletComplianceService compliance) {
         this.callers = callers;
         this.compliance = compliance;
+    }
+
+    /** Day 32: the compliance console reads a wallet's status and open freeze before acting (FR-W-3, FR-AML-3). */
+    @GetMapping(path = "/compliance/wallets/{id}", version = "1")
+    public ComplianceWalletView wallet(@PathVariable UUID id) {
+        return compliance.view(id);
     }
 
     @Audited(action = "WALLET_FREEZE", entityType = "WALLET")

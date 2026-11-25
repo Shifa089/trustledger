@@ -89,3 +89,11 @@ export function formatShortDay(day: string): string {
   const [y, m, d] = parts(day)
   return shortDay.format(new Date(Date.UTC(y, m - 1, d)))
 }
+
+/**
+ * The instant an Indian calendar day starts, for APIs that filter by Instant (the audit log):
+ * "2026-11-24" → "2026-11-23T18:30:00.000Z". India has no daylight saving, so the offset is always +05:30.
+ */
+export function startOfIndianDay(day: string): string {
+  return new Date(`${day}T00:00:00+05:30`).toISOString()
+}

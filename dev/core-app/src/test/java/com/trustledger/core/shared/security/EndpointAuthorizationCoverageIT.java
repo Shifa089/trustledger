@@ -91,6 +91,7 @@ class EndpointAuthorizationCoverageIT {
             Map.entry("GET /api/v1/wallets/me", CUSTOMER),
             Map.entry("GET /api/v1/wallets/me/transactions", CUSTOMER),
             Map.entry("GET /api/v1/wallets/me/limit-usage", CUSTOMER),
+            Map.entry("GET /api/v1/compliance/wallets/{id}", OFFICER),
             Map.entry("POST /api/v1/compliance/wallets/{id}/freeze", OFFICER),
             Map.entry("POST /api/v1/compliance/wallets/{id}/unfreeze", OFFICER),
             Map.entry("POST /api/v1/admin/reconciliation/run", ADMIN),

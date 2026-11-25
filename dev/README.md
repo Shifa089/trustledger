@@ -203,9 +203,14 @@ reload goes back through Keycloak, which signs you straight back in. Customers g
 with document upload), a wallet dashboard (balances, limits used, 30-day activity), the transaction history, add money (Razorpay
 Checkout in test mode), send money (by mobile or wallet ID, with a confirm step) and a privacy page (marketing
 consent, data export, erasure); to
-try onboarding, use "Register" on the Keycloak sign-in page to create a fresh customer. Frontend tests: `npm run ci` (lint, type-check,
-Vitest, build), `npm run e2e` (Playwright, no backend needed) and `npm run e2e:stack` (a real login; export
-`TRUSTLEDGER_DEV_USER_PASSWORD` first). Rules in [ADR 0023](docs/adr/0023-frontend-stack.md).
+try onboarding, use "Register" on the Keycloak sign-in page to create a fresh customer. Staff get their own console
+(Day 32): compliance officers review KYC (queue, document viewer with 5-minute presigned links, verify / approve /
+reject, the maker-checker refusal shown clearly), decide held transfers, freeze and unfreeze wallets, and work AML
+alerts and cases (timeline, assign, close as false positive, escalate, STR CSV download); admin1 runs
+reconciliation; auditor1 reads the audit log and verifies the hash chain. Frontend tests: `npm run ci` (lint,
+type-check, Vitest, build), `npm run e2e` (Playwright, no backend needed) and `npm run e2e:stack` (real logins; export
+`TRUSTLEDGER_DEV_USER_PASSWORD`, and for the staff specs `TRUSTLEDGER_DEV_TOTP_SECRET` and `RAZORPAY_WEBHOOK_SECRET`,
+e.g. `set -a; . ../.env; set +a`). Rules in [ADR 0023](docs/adr/0023-frontend-stack.md).
 
 ## 8. Tests
 

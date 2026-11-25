@@ -304,6 +304,7 @@ All endpoints sit under `/api/v1` (path versioning configured with Spring Framew
 | GET | `/wallets/me/limit-usage` | CUSTOMER | Limits used: transferred today and this month, added this month (counted like the limit checks) |
 | GET | `/wallets/me/transactions` | CUSTOMER | `from`, `to`, `type`, `page`, `size`, `sort` |
 | GET | `/wallets/me/statements/{yyyy-MM}` | CUSTOMER | PDF |
+| GET | `/compliance/wallets/{id}` | COMPLIANCE\_OFFICER | Status, balances and the open freeze (source COMPLIANCE or AML); for the compliance console |
 | POST | `/compliance/wallets/{id}/freeze`, `/unfreeze` | COMPLIANCE\_OFFICER | Reason required |
 | POST | `/transfers` | CUSTOMER | `Idempotency-Key` required; 201 with `status` COMPLETED or HELD\_FOR\_REVIEW |
 | GET | `/transfers/{id}` | CUSTOMER (sender or receiver) | Anyone else gets the same 404 as an unknown ID |

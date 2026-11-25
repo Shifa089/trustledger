@@ -5,11 +5,11 @@ export interface NavItem {
   to: string
   /** Shown to a user holding any of these roles. */
   roles: readonly Role[]
-  /** Planned screen (later F days): listed, not yet a link. */
+  /** Planned screen (a later F day): listed, not yet a link. */
   soon?: boolean
 }
 
-/** Navigation per actor (SPEC §2). The screens behind `soon` items arrive in Days 32-33. */
+/** Navigation per actor (SPEC §2). Convenience only: the backend enforces every role (CLAUDE.md "Frontend"). */
 export const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Dashboard', to: '/customer', roles: ['CUSTOMER'] },
   { label: 'KYC', to: '/customer/kyc', roles: ['CUSTOMER'] },
@@ -19,15 +19,17 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Privacy', to: '/customer/privacy', roles: ['CUSTOMER'] },
 
   { label: 'Compliance', to: '/compliance', roles: ['COMPLIANCE_OFFICER'] },
-  { label: 'KYC queue', to: '/compliance/kyc', roles: ['COMPLIANCE_OFFICER'], soon: true },
-  { label: 'Held transfers', to: '/compliance/transfers', roles: ['COMPLIANCE_OFFICER'], soon: true },
-  { label: 'AML cases', to: '/compliance/aml', roles: ['COMPLIANCE_OFFICER'], soon: true },
+  { label: 'KYC queue', to: '/compliance/kyc', roles: ['COMPLIANCE_OFFICER'] },
+  { label: 'Held transfers', to: '/compliance/transfers', roles: ['COMPLIANCE_OFFICER'] },
+  { label: 'Wallets', to: '/compliance/wallets', roles: ['COMPLIANCE_OFFICER'] },
+  { label: 'AML alerts', to: '/compliance/aml', roles: ['COMPLIANCE_OFFICER'] },
+  { label: 'AML cases', to: '/compliance/aml/cases', roles: ['COMPLIANCE_OFFICER'] },
 
   { label: 'Admin', to: '/admin', roles: ['ADMIN'] },
-  { label: 'Reconciliation', to: '/admin/reconciliation', roles: ['ADMIN'], soon: true },
+  { label: 'Reconciliation', to: '/admin/reconciliation', roles: ['ADMIN'] },
 
   { label: 'Audit', to: '/audit', roles: ['AUDITOR'] },
-  { label: 'Audit log', to: '/audit/events', roles: ['AUDITOR'], soon: true },
+  { label: 'Audit log', to: '/audit/events', roles: ['AUDITOR'] },
 ]
 
 export function navFor(roles: readonly Role[]): NavItem[] {

@@ -200,6 +200,12 @@ class SecurityMatrixIT {
             "GET, /api/v1/wallets/me/limit-usage,         COMPLIANCE_OFFICER, 403",
             "GET, /api/v1/wallets/me/limit-usage,         ADMIN,              403",
             "GET, /api/v1/wallets/me/limit-usage,         AUDITOR,            403",
+            // Day 32: an officer reads any wallet; an unknown ID gets past security to 404.
+            "GET, /api/v1/compliance/wallets/00000000-0000-7000-8000-000000000001, NONE,               401",
+            "GET, /api/v1/compliance/wallets/00000000-0000-7000-8000-000000000001, CUSTOMER,           403",
+            "GET, /api/v1/compliance/wallets/00000000-0000-7000-8000-000000000001, COMPLIANCE_OFFICER, 404",
+            "GET, /api/v1/compliance/wallets/00000000-0000-7000-8000-000000000001, ADMIN,              403",
+            "GET, /api/v1/compliance/wallets/00000000-0000-7000-8000-000000000001, AUDITOR,            403",
             "POST, /api/v1/compliance/wallets/00000000-0000-7000-8000-000000000001/freeze, NONE,     401",
             "POST, /api/v1/compliance/wallets/00000000-0000-7000-8000-000000000001/freeze, CUSTOMER, 403",
             "POST, /api/v1/compliance/wallets/00000000-0000-7000-8000-000000000001/freeze, COMPLIANCE_OFFICER, 400",

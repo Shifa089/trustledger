@@ -51,6 +51,16 @@ public class WalletComplianceService {
         this.clock = clock;
     }
 
+    /**
+     * An officer's read of any wallet: status, balances and the open freeze (source COMPLIANCE or AML). No lock: the
+     * console only shows it, and freeze/unfreeze lock the row themselves.
+     */
+    @Transactional(readOnly = true)
+    public ComplianceWalletView view(UUID walletId) {
+        return wallets.findById(walletId).map(ComplianceWalletView::of)
+                .orElseThrow(() -> new TrustLedgerException(ErrorCode.NOT_FOUND, "Wallet not found."));
+    }
+
     @Transactional
     public ComplianceWalletView freeze(UUID walletId, UUID officerId, String reason) {
         Wallet wallet = lock(walletId);
