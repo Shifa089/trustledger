@@ -58,6 +58,22 @@ password grant, no client secret.
 - **Errors:** turns a ProblemDetail into an `ApiError` whose message is a friendly text per `errorCode`. A unit test
   reads both backends' `ErrorCode` enums, so a new code without a message fails the build.
 
+**Idempotency keys (Day 31).** The screen that moves money owns the key, not the client:
+- Send money makes one key when the customer presses "Review". "Send" and "Try again" reuse it, and going back to
+  edit throws it away.
+- Add money makes one key per form submission and reuses it when the same amount is submitted again after a failure.
+- A synchronous in-flight flag (a ref) drops a second click before the button re-renders as disabled.
+- The backend replays a stored 2xx for a known key and releases the key on any non-2xx, so a retry is always safe.
+
+**Razorpay Checkout (Day 31).** Add money opens Razorpay's hosted Checkout script
+(`https://checkout.razorpay.com/v1/checkout.js`).
+- It is loaded on first use by `src/features/topup/razorpay.ts`. It is not an npm dependency, because Razorpay only
+  ships it as a hosted script. The backend's local `checkout.html` already used it (M7).
+- Only the public test key ID and the order ID from `POST /topups` reach the browser.
+- What Checkout reports is informational only: the wallet is credited by the signed webhook or the reconciler.
+- A deployment with a CSP (Day 33) must allow `script-src https://checkout.razorpay.com` and
+  `frame-src https://api.razorpay.com`.
+
 **Roles in the UI.** `realm_access.roles` is read from the access token only to pick routes and navigation
 (`RequireRole`). The server still checks role and ownership on every request.
 

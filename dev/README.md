@@ -200,7 +200,9 @@ npm run dev          # http://localhost:5173; local defaults in src/config.ts
 
 Sign in as any test user: each role gets its own navigation. Tokens stay in memory (never localStorage), so a page
 reload goes back through Keycloak, which signs you straight back in. Customers get KYC onboarding (minimum and full,
-with document upload), a wallet dashboard (balances, limits used, 30-day activity) and the transaction history; to
+with document upload), a wallet dashboard (balances, limits used, 30-day activity), the transaction history, add money (Razorpay
+Checkout in test mode), send money (by mobile or wallet ID, with a confirm step) and a privacy page (marketing
+consent, data export, erasure); to
 try onboarding, use "Register" on the Keycloak sign-in page to create a fresh customer. Frontend tests: `npm run ci` (lint, type-check,
 Vitest, build), `npm run e2e` (Playwright, no backend needed) and `npm run e2e:stack` (a real login; export
 `TRUSTLEDGER_DEV_USER_PASSWORD` first). Rules in [ADR 0023](docs/adr/0023-frontend-stack.md).
