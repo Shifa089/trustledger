@@ -74,6 +74,9 @@ describe('routes', () => {
     ['/customer/kyc/min', 'KYC'],
     ['/customer/kyc/full', 'KYC'],
     ['/customer/history', 'History'],
+    ['/customer/add-money', 'Add money'],
+    ['/customer/send', 'Send money'],
+    ['/customer/privacy', 'Privacy'],
   ])('links %s in the customer navigation and keeps it for customers only', async (path, navLabel) => {
     const { unmount } = renderRoutes(routes, { path: '/customer', auth: fakeAuth(['CUSTOMER']).auth })
     expect(await mainNav().findByRole('link', { name: navLabel })).toHaveAttribute('href', path.startsWith('/customer/kyc') ? '/customer/kyc' : path)
@@ -82,6 +85,16 @@ describe('routes', () => {
     const { router } = renderRoutes(routes, { path, auth: fakeAuth(['COMPLIANCE_OFFICER']).auth })
     expect(await screen.findByRole('heading', { name: 'Not available for your role' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/forbidden')
+  })
+
+  it.each([
+    ['/customer/add-money', 'Add money'],
+    ['/customer/send', 'Send money'],
+    ['/customer/privacy', 'Privacy'],
+  ])('opens %s for a customer', async (path, heading) => {
+    renderRoutes(routes, { path, auth: fakeAuth(['CUSTOMER']).auth })
+    expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: 'Test mode' })).toBeInTheDocument()
   })
 
   it('loads the profile from core-app and open cases from the AML service', async () => {

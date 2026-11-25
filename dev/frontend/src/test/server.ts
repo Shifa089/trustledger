@@ -88,6 +88,10 @@ export const handlers = [
   http.get(`${CORE}/wallets/me`, () => HttpResponse.json(FULL_WALLET)),
   http.get(`${CORE}/wallets/me/limit-usage`, () => HttpResponse.json(USAGE)),
   http.get(`${CORE}/wallets/me/transactions`, () => HttpResponse.json(EMPTY_HISTORY)),
+  http.get(`${CORE}/me/consents`, () =>
+    HttpResponse.json({ requiredGiven: true, consents: [], policyVersions: { MARKETING: '2026-11-01' } }),
+  ),
+  http.get(`${CORE}/me/data-requests`, () => HttpResponse.json({ items: [] })),
   http.get(`${AML}/aml/cases`, () =>
     HttpResponse.json({ content: [], page: 0, size: 1, totalElements: 3, totalPages: 3 }),
   ),

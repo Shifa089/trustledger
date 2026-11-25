@@ -8,6 +8,9 @@ import { FullKycPage } from '@/features/kyc/FullKycPage'
 import { KycStatusPage } from '@/features/kyc/KycStatusPage'
 import { MinKycPage } from '@/features/kyc/MinKycPage'
 import { TransactionHistory } from '@/features/history/TransactionHistory'
+import { PrivacyPage } from '@/features/privacy/PrivacyPage'
+import { AddMoneyPage } from '@/features/topup/AddMoneyPage'
+import { SendMoneyPage } from '@/features/transfer/SendMoneyPage'
 import { WalletDashboard } from '@/features/wallet/WalletDashboard'
 import { AdminHome } from '@/pages/admin/AdminHome'
 import { AuditHome } from '@/pages/audit/AuditHome'
@@ -48,6 +51,9 @@ export const routes: RouteObject[] = [
                   { path: 'kyc/min', element: <MinKycPage /> },
                   { path: 'kyc/full', element: <FullKycPage /> },
                   { path: 'history', element: <TransactionHistory /> },
+                  { path: 'add-money', element: <AddMoneyPage /> },
+                  { path: 'send', element: <SendMoneyPage /> },
+                  { path: 'privacy', element: <PrivacyPage /> },
                 ],
               },
               {

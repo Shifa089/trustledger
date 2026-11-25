@@ -130,3 +130,78 @@ export interface TransactionHistory {
   totalPages: number
   nextCursor?: string | null
 }
+
+// --- Payments (FR-P-1..4) ---
+
+export type TransferStatus = 'INITIATED' | 'HELD_FOR_REVIEW' | 'COMPLETED' | 'REJECTED'
+
+/** POST /transfers body: exactly one of recipientMobile and recipientWalletId. Amount as a decimal string. */
+export interface TransferRequest {
+  recipientMobile?: string
+  recipientWalletId?: string
+  amount: string
+  note?: string
+}
+
+/** POST /transfers (201) and GET /transfers/{id}. */
+export interface Transfer {
+  id: string
+  status: TransferStatus
+  senderWalletId: string
+  receiverWalletId: string
+  amount: string
+  currency: string
+  note: string | null
+  createdAt: string
+}
+
+export type TopupStatus = 'CREATED' | 'PENDING' | 'CAPTURED' | 'PARKED' | 'FAILED' | 'EXPIRED'
+
+/** POST /topups (201) and GET /topups/{id}: the Razorpay order and the public test key ID for Checkout. */
+export interface Topup {
+  id: string
+  status: TopupStatus
+  amount: string
+  currency: string
+  gatewayOrderId: string | null
+  gatewayPaymentId: string | null
+  keyId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+// --- Consent and privacy (FR-ID-3, FR-PR-2) ---
+
+export type ConsentPurpose = 'TERMS' | 'PRIVACY' | 'MARKETING'
+
+export interface ConsentItem {
+  purpose: ConsentPurpose
+  granted: boolean
+  policyVersion: string
+  capturedAt: string
+}
+
+/** GET/POST /me/consents. */
+export interface ConsentOverview {
+  requiredGiven: boolean
+  consents: ConsentItem[]
+  policyVersions: Partial<Record<ConsentPurpose, string>>
+}
+
+export type DataRequestType = 'EXPORT' | 'ERASURE'
+export type DataRequestStatus = 'PENDING' | 'COMPLETED' | 'FAILED'
+
+/** One export or erasure request; `download` only on a COMPLETED export (a short-lived presigned link). */
+export interface DataRequest {
+  id: string
+  type: DataRequestType
+  status: DataRequestStatus
+  requestedAt: string
+  completedAt: string | null
+  download: { url: string; expiresAt: string } | null
+}
+
+/** GET /me/data-requests. */
+export interface DataRequests {
+  items: DataRequest[]
+}

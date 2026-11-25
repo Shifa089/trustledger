@@ -73,6 +73,8 @@ Vitest + React Testing Library + MSW, Playwright, ESLint. Node version in fronte
   stays the authority. Days in India time (src/lib/dates.ts), money via formatMoney/parseRupees (src/lib/money.ts).
 - No money arithmetic with floating point: amounts are decimal strings from the API, bigint paise in
   the browser (src/lib/money.ts). No Number()/parseFloat on money.
+- Money POSTs (/transfers, /topups): one Idempotency-Key per attempt, reused on retry, new when the details change;
+  a ref-based in-flight guard plus a disabled button stops double submits (ADR 0023).
 - Tokens never in localStorage or sessionStorage: oidc-client-ts userStore is in memory only.
 - UI role checks (RequireRole, navigation) are convenience; the backend enforces every role and
   ownership rule. A new screen needs its route under the right RequireRole and a nav entry.
